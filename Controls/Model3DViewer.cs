@@ -18,6 +18,12 @@ namespace MauiApp3.Controls
         private bool _isRotating;
         private bool _isPanning;
 
+        // Cached objects for performance
+        private readonly List<(StlParser.Triangle triangle, float depth, Vector3[] vertices)> _transformedTriangles = new();
+        private SKPaint? _fillPaint;
+        private SKPaint? _strokePaint;
+        private readonly float _degToRadFactor = MathF.PI / 180f;
+
         public Model3DViewer()
         {
             EnableTouchEvents = true;
@@ -47,7 +53,6 @@ namespace MauiApp3.Controls
             {
                 case SKTouchAction.Pressed:
                     _lastTouchPoint = new Vector2(e.Location.X, e.Location.Y);
-                    // Determine if rotating or panning (e.g., two fingers for pan)
                     _isRotating = true;
                     e.Handled = true;
                     break;
@@ -76,8 +81,7 @@ namespace MauiApp3.Controls
                     break;
 
                 case SKTouchAction.WheelChanged:
-                    _zoom += e.WheelDelta * 0.01f;
-                    _zoom = Math.Clamp(_zoom, 0.1f, 5.0f);
+                    _zoom = Math.Clamp(_zoom + (e.WheelDelta * 0.01f), 0.1f, 5.0f);
                     InvalidateSurface();
                     e.Handled = true;
                     break;
@@ -90,148 +94,147 @@ namespace MauiApp3.Controls
             canvas.Clear(SKColors.Transparent);
 
             if (_model == null || _model.Triangles.Count == 0)
-            {
                 return;
-            }
 
             var info = e.Info;
-            float centerX = info.Width / 2f;
-            float centerY = info.Height / 2f;
+            float centerX = info.Width * 0.5f;
+            float centerY = info.Height * 0.5f;
             float scale = Math.Min(info.Width, info.Height) * 0.4f * _zoom;
 
             canvas.Translate(centerX + _panOffset.X, centerY + _panOffset.Y);
 
-            // Create transformation matrices
-            var rotation = Matrix4x4.CreateRotationX(DegToRad(_rotationX)) *
-                          Matrix4x4.CreateRotationY(DegToRad(_rotationY)) *
-                          Matrix4x4.CreateRotationZ(DegToRad(_rotationZ));
+            // Create transformation matrix once
+            var rotation = Matrix4x4.CreateRotationX(_rotationX * _degToRadFactor) *
+                          Matrix4x4.CreateRotationY(_rotationY * _degToRadFactor) *
+                          Matrix4x4.CreateRotationZ(_rotationZ * _degToRadFactor);
 
-            // Prepare triangles with depth for sorting
-            var transformedTriangles = new List<(StlParser.Triangle triangle, float depth, Vector3[] vertices)>();
+            // Reuse list to avoid allocations
+            _transformedTriangles.Clear();
+            if (_transformedTriangles.Capacity < _model.Triangles.Count)
+            {
+                _transformedTriangles.Capacity = _model.Triangles.Count;
+            }
 
+            // Pre-calculate light direction
+            var lightDir = Vector3.Normalize(new Vector3(0.5f, -0.7f, -1));
+
+            // Transform and cull triangles
             foreach (var triangle in _model.Triangles)
             {
                 var v1 = TransformVertex(triangle.Vertex1, _model.Center, _model.Scale, rotation, scale);
                 var v2 = TransformVertex(triangle.Vertex2, _model.Center, _model.Scale, rotation, scale);
                 var v3 = TransformVertex(triangle.Vertex3, _model.Center, _model.Scale, rotation, scale);
 
-                float avgDepth = (v1.Z + v2.Z + v3.Z) / 3;
-                transformedTriangles.Add((triangle, avgDepth, new[] { v1, v2, v3 }));
+                // Backface culling (early)
+                var edge1X = v2.X - v1.X;
+                var edge1Y = v2.Y - v1.Y;
+                var edge2X = v3.X - v1.X;
+                var edge2Y = v3.Y - v1.Y;
+                float cross = edge1X * edge2Y - edge1Y * edge2X;
+                
+                if (cross < 0) continue;
+
+                float avgDepth = (v1.Z + v2.Z + v3.Z) * 0.333333f;
+                _transformedTriangles.Add((triangle, avgDepth, new[] { v1, v2, v3 }));
             }
 
-            // Sort by depth (painter's algorithm - far to near)
-            transformedTriangles.Sort((a, b) => a.depth.CompareTo(b.depth));
+            // Sort by depth (painter's algorithm)
+            _transformedTriangles.Sort((a, b) => a.depth.CompareTo(b.depth));
+
+            // Reuse paint objects
+            _fillPaint ??= new SKPaint
+            {
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+
+            _strokePaint ??= new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = SKColors.Black.WithAlpha(30),
+                StrokeWidth = 0.5f,
+                IsAntialias = true
+            };
 
             // Draw triangles
-            foreach (var (triangle, _, vertices) in transformedTriangles)
+            using var path = new SKPath();
+            foreach (var (triangle, _, vertices) in _transformedTriangles)
             {
                 var v1 = vertices[0];
                 var v2 = vertices[1];
                 var v3 = vertices[2];
 
-                // Calculate lighting (simple directional lighting)
+                // Calculate lighting
                 var normal = Vector3.Normalize(Vector3.Transform(triangle.Normal, rotation));
-                var lightDir = Vector3.Normalize(new Vector3(0.5f, -0.7f, -1));
-                float lightIntensity = Math.Max(0, Vector3.Dot(normal, -lightDir));
-                lightIntensity = 0.3f + (lightIntensity * 0.7f); // Ambient + diffuse
+                float lightIntensity = Math.Max(0, -Vector3.Dot(normal, lightDir));
+                lightIntensity = 0.3f + (lightIntensity * 0.7f);
 
-                // Backface culling
-                var edge1 = new Vector2(v2.X - v1.X, v2.Y - v1.Y);
-                var edge2 = new Vector2(v3.X - v1.X, v3.Y - v1.Y);
-                float cross = edge1.X * edge2.Y - edge1.Y * edge2.X;
-                
-                if (cross < 0) continue; // Skip back-facing triangles
-
-                // Create color based on lighting
+                // Set color
                 byte colorValue = (byte)(255 * lightIntensity);
-                var color = new SKColor(colorValue, colorValue, colorValue);
+                _fillPaint.Color = new SKColor(colorValue, colorValue, colorValue);
 
-                using var path = new SKPath();
+                // Reuse path
+                path.Rewind();
                 path.MoveTo(v1.X, v1.Y);
                 path.LineTo(v2.X, v2.Y);
                 path.LineTo(v3.X, v3.Y);
                 path.Close();
 
-                using var fillPaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Fill,
-                    Color = color,
-                    IsAntialias = true
-                };
-
-                using var strokePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = SKColors.Black.WithAlpha(30),
-                    StrokeWidth = 0.5f,
-                    IsAntialias = true
-                };
-
-                canvas.DrawPath(path, fillPaint);
-                canvas.DrawPath(path, strokePaint);
+                canvas.DrawPath(path, _fillPaint);
+                canvas.DrawPath(path, _strokePaint);
             }
 
-            // Draw axis indicators (optional)
+            // Draw axis indicators
             DrawAxisIndicators(canvas, rotation, scale * 0.3f, info);
         }
 
         private Vector3 TransformVertex(Vector3 vertex, Vector3 center, float modelScale, Matrix4x4 rotation, float screenScale)
         {
-            // Center the model
-            var centered = vertex - center;
-            
-            // Apply model scale to fit unit cube
-            centered *= modelScale;
-            
-            // Apply rotation
+            // Combine transformations for fewer operations
+            var centered = (vertex - center) * modelScale;
             var rotated = Vector3.Transform(centered, rotation);
-            
-            // Apply screen scale
             return rotated * screenScale;
         }
 
         private void DrawAxisIndicators(SKCanvas canvas, Matrix4x4 rotation, float length, SKImageInfo info)
         {
-            // Draw small axis indicators in the corner
             canvas.Save();
             canvas.ResetMatrix();
             canvas.Translate(50, info.Height - 50);
 
             var axes = new[]
             {
-                (Vector3.UnitX, SKColors.Red, "X"),
-                (Vector3.UnitY, SKColors.Green, "Y"),
-                (Vector3.UnitZ, SKColors.Blue, "Z")
+                (axis: Vector3.UnitX, color: SKColors.Red, label: "X"),
+                (axis: Vector3.UnitY, color: SKColors.Green, label: "Y"),
+                (axis: Vector3.UnitZ, color: SKColors.Blue, label: "Z")
+            };
+
+            using var linePaint = new SKPaint
+            {
+                StrokeWidth = 2,
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke
+            };
+
+            using var textPaint = new SKPaint
+            {
+                TextSize = 12,
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center
             };
 
             foreach (var (axis, color, label) in axes)
             {
                 var transformed = Vector3.Transform(axis, rotation) * length;
 
-                using var paint = new SKPaint
-                {
-                    Color = color,
-                    StrokeWidth = 2,
-                    IsAntialias = true,
-                    Style = SKPaintStyle.Stroke
-                };
+                linePaint.Color = color;
+                canvas.DrawLine(0, 0, transformed.X, -transformed.Y, linePaint);
 
-                canvas.DrawLine(0, 0, transformed.X, -transformed.Y, paint);
-
-                using var textPaint = new SKPaint
-                {
-                    Color = color,
-                    TextSize = 12,
-                    IsAntialias = true,
-                    TextAlign = SKTextAlign.Center
-                };
-
+                textPaint.Color = color;
                 canvas.DrawText(label, transformed.X, -transformed.Y - 5, textPaint);
             }
 
             canvas.Restore();
         }
-
-        private float DegToRad(float degrees) => degrees * (float)Math.PI / 180f;
     }
 }
