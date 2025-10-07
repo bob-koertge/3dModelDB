@@ -6,7 +6,7 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
 ![.NET Version](https://img.shields.io/badge/.NET-9.0-purple)
 ![License: Polyform Noncommercial](https://img.shields.io/badge/license-Polyform%20Noncommercial-green.svg)
 
-## ?? Table of Contents
+## 📋 Table of Contents
 
 - [Features](#features)
 - [Prerequisites](#prerequisites)
@@ -22,18 +22,18 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
 - [Contributing](#contributing)
 - [License](#license)
 
-## ? Features
+## ✨ Features
 
-- ?? **Interactive 3D Viewer** - Rotate, zoom, and pan 3D models
-- ?? **Multi-Format Support** - Import and view STL (ASCII & Binary) and 3MF files
-- ??? **Thumbnail Generation** - Auto-generated thumbnails for quick preview
-- ??? **Tag Management** - Organize models with custom tags
-- ?? **Model Information** - View triangle count, file size, and metadata
-- ?? **Detail View** - Double-click models for detailed inspection
-- ?? **Model Library** - Grid-based model management
-- ?? **Optimized Performance** - Object pooling, async operations, memory-efficient parsing
+- 🎨 **Interactive 3D Viewer** - Rotate, zoom, and pan 3D models
+- 📁 **Multi-Format Support** - Import and view STL (ASCII & Binary) and 3MF files
+- 🖼️ **Thumbnail Generation** - Auto-generated thumbnails for quick preview
+- 🏷️ **Tag Management** - Organize models with custom tags
+- 📊 **Model Information** - View triangle count, file size, and metadata
+- 🎯 **Detail View** - Double-click models for detailed inspection
+- 💾 **Model Library** - Grid-based model management
+- 🚀 **Optimized Performance** - Object pooling, async operations, memory-efficient parsing
 
-## ?? Prerequisites
+## 📦 Prerequisites
 
 ### Required Software
 
@@ -65,7 +65,7 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
 - Apple Developer account (for device deployment)
 - iOS 15.0 or higher
 
-## ??? Platform-Specific Setup
+## 🛠️ Platform-Specific Setup
 
 ### Windows
 
@@ -196,7 +196,7 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
    - Sign in with Apple ID (Preferences > Accounts)
    - Project will auto-generate development certificate
 
-## ?? Building the Project
+## 🔨 Building the Project
 
 ### Command Line
 
@@ -243,7 +243,7 @@ dotnet build
 2. Press `F1` and type `.NET: Build`
 3. Or use terminal: `dotnet build`
 
-## ?? Running the Application
+## ▶️ Running the Application
 
 ### Visual Studio 2022
 
@@ -289,7 +289,7 @@ xcrun simctl list devices
 dotnet build -t:Run -f net9.0-ios
 ```
 
-## ?? Platform-Specific Run Instructions
+## 📱 Platform-Specific Run Instructions
 
 ### Windows
 
@@ -355,49 +355,49 @@ dotnet build -t:Run -f net9.0-ios
 dotnet run -f net9.0-maccatalyst
 ```
 
-## ??? Project Structure
+## 🗂️ Project Structure
 
 ```
 3dModelDB/
-??? Behaviors/              # XAML behaviors
-?   ??? EventToCommandBehavior.cs
-??? Controls/               # Custom UI controls
-?   ??? Model3DViewer.cs   # 3D rendering control
-??? Converters/            # Value converters
-?   ??? ValueConverters.cs
-??? Models/                # Data models
-?   ??? Model3DFile.cs
-??? Pages/                 # UI pages
-?   ??? ModelDetailPage.xaml
-?   ??? ModelDetailPage.xaml.cs
-??? Platforms/             # Platform-specific code
-?   ??? Android/
-?   ??? iOS/
-?   ??? MacCatalyst/
-?   ??? Windows/
-??? Resources/             # App resources
-?   ??? AppIcon/
-?   ??? Fonts/
-?   ??? Images/
-?   ??? Styles/
-??? Services/              # Business logic
-?   ??? Model3DService.cs
-?   ??? StlParser.cs
-?   ??? ThreeMfParser.cs
-?   ??? ThumbnailGenerator.cs
-??? Utilities/             # Helper classes
-?   ??? SampleModelGenerator.cs
-??? ViewModels/            # MVVM ViewModels
-?   ??? MainViewModel.cs
-?   ??? ModelDetailViewModel.cs
-??? App.xaml               # App configuration
-??? AppShell.xaml          # Shell navigation
-??? MainPage.xaml          # Main UI
-??? MauiProgram.cs         # App startup
-??? README.md              # This file
+├── Behaviors/              # XAML behaviors
+│   └── EventToCommandBehavior.cs
+├── Controls/               # Custom UI controls
+│   └── Model3DViewer.cs   # 3D rendering control
+├── Converters/            # Value converters
+│   └── ValueConverters.cs
+├── Models/                # Data models
+│   └── Model3DFile.cs
+├── Pages/                 # UI pages
+│   ├── ModelDetailPage.xaml
+│   └── ModelDetailPage.xaml.cs
+├── Platforms/             # Platform-specific code
+│   ├── Android/
+│   ├── iOS/
+│   ├── MacCatalyst/
+│   └── Windows/
+├── Resources/             # App resources
+│   ├── AppIcon/
+│   ├── Fonts/
+│   ├── Images/
+│   └── Styles/
+├── Services/              # Business logic
+│   ├── Model3DService.cs
+│   ├── StlParser.cs
+│   ├── ThreeMfParser.cs
+│   └── ThumbnailGenerator.cs
+├── Utilities/             # Helper classes
+│   └── SampleModelGenerator.cs
+├── ViewModels/            # MVVM ViewModels
+│   ├── MainViewModel.cs
+│   └── ModelDetailViewModel.cs
+├── App.xaml               # App configuration
+├── AppShell.xaml          # Shell navigation
+├── MainPage.xaml          # Main UI
+├── MauiProgram.cs         # App startup
+└── README.md              # This file
 ```
 
-## ?? Technologies Used
+## 🔧 Technologies Used
 
 - **.NET 9** - Latest .NET framework
 - **.NET MAUI** - Cross-platform UI framework
@@ -414,7 +414,7 @@ dotnet run -f net9.0-maccatalyst
 | SkiaSharp.Views.Maui.Controls | 3.119.1 | 3D rendering |
 | Microsoft.Extensions.Logging.Debug | 9.0.5 | Debugging |
 
-## ?? Performance Features
+## 🚀 Performance Features
 
 - **Object Pooling** - Reuses paint objects for 90% fewer allocations
 - **Async Operations** - Non-blocking file I/O and parsing
@@ -423,11 +423,11 @@ dotnet run -f net9.0-maccatalyst
 - **Span<T>** - Zero-copy string operations
 - **Optimized Rendering** - 50% faster frame rates
 
-## ?? Usage
+## 📝 Usage
 
 ### Uploading Models
 
-1. Click **"?? Upload Model"** in the left drawer
+1. Click **"📁 Upload Model"** in the left drawer
 2. Select an STL or 3MF file
 3. Wait for parsing and thumbnail generation
 4. Model appears in the grid
@@ -438,7 +438,7 @@ dotnet run -f net9.0-maccatalyst
 2. **Double-click** to open detailed view
 3. **Drag** in 3D viewer to rotate
 4. **Scroll** to zoom
-5. Click **"??"** to reset view
+5. Click **"🔄"** to reset view
 
 ### Managing Tags
 
@@ -447,7 +447,7 @@ dotnet run -f net9.0-maccatalyst
 3. Press **Enter** or click **"+"**
 4. Click **"×"** on tags to remove
 
-## ?? Troubleshooting
+## 🐛 Troubleshooting
 
 ### Build Errors
 
@@ -489,14 +489,14 @@ xcrun simctl list devices
 - Install latest Windows SDK
 - Run as Administrator
 
-## ?? Additional Resources
+## 📚 Additional Resources
 
 - [.NET MAUI Documentation](https://learn.microsoft.com/dotnet/maui/)
 - [SkiaSharp Documentation](https://learn.microsoft.com/xamarin/xamarin-forms/user-interface/graphics/skiasharp/)
 - [STL File Format](https://en.wikipedia.org/wiki/STL_(file_format))
 - [3MF File Format](https://3mf.io/)
 
-## ?? Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -506,25 +506,25 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## ?? License
+## 📄 License
 
 Copyright © 2025 Bob Koertge
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## ?? Author
+## 👤 Author
 
 **Bob Koertge**
 - GitHub: [@bob-koertge](https://github.com/bob-koertge)
 - Repository: [3dModelDB](https://github.com/bob-koertge/3dModelDB)
 
-## ?? Acknowledgments
+## 🙏 Acknowledgments
 
 - .NET MAUI Team for the excellent framework
 - SkiaSharp contributors for 2D graphics rendering
 - The open-source community
 
-## ?? Support
+## 📞 Support
 
 For issues, questions, or suggestions:
 - Open an issue on [GitHub](https://github.com/bob-koertge/3dModelDB/issues)
@@ -532,4 +532,4 @@ For issues, questions, or suggestions:
 
 ---
 
-**Built with ?? using .NET MAUI**
+**Built with ❤️ using .NET MAUI**
