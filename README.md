@@ -4,7 +4,7 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
 
 ![Platform Support](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows-blue)
 ![.NET Version](https://img.shields.io/badge/.NET-9.0-purple)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License: Polyform Noncommercial](https://img.shields.io/badge/license-Polyform%20Noncommercial-blue.svg)
 
 ## ?? Table of Contents
 
@@ -445,7 +445,7 @@ dotnet run -f net9.0-maccatalyst
 1. Select a model
 2. Type tag name in the input field
 3. Press **Enter** or click **"+"**
-4. Click **"×"** on tags to remove
+4. Click **"Ã—"** on tags to remove
 
 ## ?? Troubleshooting
 
@@ -508,7 +508,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## ?? License
 
-Copyright © 2025 Bob Koertge
+Copyright Â© 2025 Bob Koertge
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
