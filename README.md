@@ -4,7 +4,7 @@ A cross-platform 3D model viewer and management application built with .NET MAUI
 
 ![Platform Support](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows-blue)
 ![.NET Version](https://img.shields.io/badge/.NET-9.0-purple)
-![License: Polyform Noncommercial](https://img.shields.io/badge/license-Polyform%20Noncommercial-blue.svg)
+![License: Polyform Noncommercial](https://img.shields.io/badge/license-Polyform%20Noncommercial-green.svg)
 
 ## ?? Table of Contents
 
