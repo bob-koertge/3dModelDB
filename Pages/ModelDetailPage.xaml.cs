@@ -1,5 +1,6 @@
 using MauiApp3.Models;
 using MauiApp3.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace MauiApp3.Pages
 {
@@ -38,7 +39,7 @@ namespace MauiApp3.Pages
             }
 
             // Subscribe to reset view message
-            MessagingCenter.Subscribe<ModelDetailViewModel>(this, "ResetView", (sender) =>
+            WeakReferenceMessenger.Default.Register<ResetViewMessage>(this, (r, m) =>
             {
                 Model3DViewer.ResetView();
             });
@@ -47,7 +48,7 @@ namespace MauiApp3.Pages
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
-            MessagingCenter.Unsubscribe<ModelDetailViewModel>(this, "ResetView");
+            WeakReferenceMessenger.Default.Unregister<ResetViewMessage>(this);
         }
     }
 }

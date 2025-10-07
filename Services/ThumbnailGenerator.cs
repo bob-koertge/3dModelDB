@@ -1,6 +1,5 @@
 using SkiaSharp;
 using System.Numerics;
-using MauiApp3.Services;
 
 namespace MauiApp3.Services
 {
@@ -17,8 +16,9 @@ namespace MauiApp3.Services
         // Cache for thumbnail generation
         private readonly SKPaint _fillPaint;
         private readonly SKPaint _borderPaint;
-        private readonly SKPaint _iconPaint;
-        private readonly SKPaint _typePaint;
+        private readonly SKFont _iconFont;
+        private readonly SKFont _typeFont;
+        private readonly SKPaint _textPaint;
 
         public ThumbnailGenerator()
         {
@@ -37,21 +37,18 @@ namespace MauiApp3.Services
                 IsAntialias = true
             };
 
-            _iconPaint = new SKPaint
+            // Use SKFont instead of obsolete SKPaint text properties
+            _iconFont = new SKFont
             {
-                Color = new SKColor(100, 100, 100),
-                TextSize = 60,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Center
+                Size = 60
             };
 
-            _typePaint = new SKPaint
+            var boldTypeface = SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+            _typeFont = new SKFont(boldTypeface, 16);
+
+            _textPaint = new SKPaint
             {
-                Color = new SKColor(0, 120, 212),
-                TextSize = 16,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Center,
-                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
+                IsAntialias = true
             };
         }
 
@@ -171,10 +168,12 @@ namespace MauiApp3.Services
             canvas.Clear(new SKColor(30, 30, 30));
 
             // Draw centered icon
-            canvas.DrawText("??", width * 0.5f, height * 0.5f + 20, _iconPaint);
+            _textPaint.Color = new SKColor(100, 100, 100);
+            canvas.DrawText("??", width * 0.5f, height * 0.5f + 20, SKTextAlign.Center, _iconFont, _textPaint);
 
             // Draw file type
-            canvas.DrawText(fileType, width * 0.5f, height - 20, _typePaint);
+            _textPaint.Color = new SKColor(0, 120, 212);
+            canvas.DrawText(fileType, width * 0.5f, height - 20, SKTextAlign.Center, _typeFont, _textPaint);
 
             // Convert to byte array
             using var image = surface.Snapshot();

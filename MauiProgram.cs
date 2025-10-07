@@ -21,6 +21,7 @@ namespace MauiApp3
 
             // Register services
             builder.Services.AddSingleton<Model3DService>();
+            builder.Services.AddSingleton<DatabaseService>();
             
             // Register ViewModels
             builder.Services.AddTransient<MainViewModel>();

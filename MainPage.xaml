@@ -80,7 +80,7 @@
                             
 
                             <Button Text="📁 Upload Model"
-                                    Command="{Binding UploadModelCommand}"
+                                    Clicked="OnUploadButtonClicked"
                                     BackgroundColor="#0078D4"
                                     TextColor="White"
                                     CornerRadius="6"
@@ -307,7 +307,7 @@
                                    HorizontalOptions="Center"
                                    Margin="0,10,0,0"/>
                             <Button Text="Upload Your First Model"
-                                    Command="{Binding UploadModelCommand}"
+                                    Clicked="OnUploadButtonClicked"
                                     BackgroundColor="#0078D4"
                                     TextColor="White"
                                     Margin="0,20,0,0"
