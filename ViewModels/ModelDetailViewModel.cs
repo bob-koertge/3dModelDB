@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace MauiApp3.ViewModels
 {
@@ -78,8 +79,8 @@ namespace MauiApp3.ViewModels
 
         private void ResetView()
         {
-            // This will be handled by the page's code-behind
-            MessagingCenter.Send(this, "ResetView");
+            // Send message to page to reset view
+            WeakReferenceMessenger.Default.Send(new ResetViewMessage());
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -88,5 +89,10 @@ namespace MauiApp3.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    // Message for resetting the view
+    public class ResetViewMessage
+    {
     }
 }

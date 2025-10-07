@@ -16,7 +16,6 @@ namespace MauiApp3.Controls
         private Vector2 _panOffset = Vector2.Zero;
         private Vector2? _lastTouchPoint;
         private bool _isRotating;
-        private bool _isPanning;
 
         // Cached objects for performance
         private readonly List<(StlParser.Triangle triangle, float depth, Vector3[] vertices)> _transformedTriangles = new();
@@ -76,7 +75,6 @@ namespace MauiApp3.Controls
                 case SKTouchAction.Cancelled:
                     _lastTouchPoint = null;
                     _isRotating = false;
-                    _isPanning = false;
                     e.Handled = true;
                     break;
 
@@ -216,11 +214,14 @@ namespace MauiApp3.Controls
                 Style = SKPaintStyle.Stroke
             };
 
+            using var font = new SKFont
+            {
+                Size = 12
+            };
+
             using var textPaint = new SKPaint
             {
-                TextSize = 12,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Center
+                IsAntialias = true
             };
 
             foreach (var (axis, color, label) in axes)
@@ -231,7 +232,7 @@ namespace MauiApp3.Controls
                 canvas.DrawLine(0, 0, transformed.X, -transformed.Y, linePaint);
 
                 textPaint.Color = color;
-                canvas.DrawText(label, transformed.X, -transformed.Y - 5, textPaint);
+                canvas.DrawText(label, transformed.X, -transformed.Y - 5, SKTextAlign.Center, font, textPaint);
             }
 
             canvas.Restore();

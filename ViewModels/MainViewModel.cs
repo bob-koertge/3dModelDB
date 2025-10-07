@@ -10,6 +10,7 @@ namespace MauiApp3.ViewModels
     public class MainViewModel : INotifyPropertyChanged
     {
         private readonly Model3DService _model3DService;
+        private readonly DatabaseService _databaseService;
         private bool _isDrawerOpen = true;
         private Model3DFile? _selectedModel;
         private double _drawerWidth = 250;
@@ -72,20 +73,33 @@ namespace MauiApp3.ViewModels
         public ICommand RemoveTagCommand { get; }
         public ICommand OpenDetailCommand { get; }
 
-        public MainViewModel(Model3DService model3DService)
+        public MainViewModel(Model3DService model3DService, DatabaseService databaseService)
         {
             _model3DService = model3DService;
+            _databaseService = databaseService;
             
             ToggleDrawerCommand = new Command(ToggleDrawer);
-            UploadModelCommand = new Command(async () => await UploadModel(), () => !IsLoading);
+            UploadModelCommand = new Command(OnUploadModel, () => !IsLoading);
             SelectModelCommand = new Command<Model3DFile>(SelectModel);
             DeleteModelCommand = new Command<Model3DFile>(DeleteModel);
             AddTagCommand = new Command(AddTag, () => SelectedModel != null && !string.IsNullOrWhiteSpace(NewTagText));
             RemoveTagCommand = new Command<string>(RemoveTag);
             OpenDetailCommand = new Command<Model3DFile>(async (model) => await OpenDetailView(model));
 
-            // Load sample data asynchronously
-            _ = LoadSampleDataAsync();
+            // Load data from database instead of sample data
+            _ = LoadDataFromDatabaseAsync();
+        }
+
+        private void OnUploadModel()
+        {
+            Console.WriteLine("OnUploadModel: Method called!");
+            
+            // Ensure we're on the main thread
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                Console.WriteLine("OnUploadModel: Executing on MainThread");
+                await UploadModelAsync();
+            });
         }
 
         private void ToggleDrawer()
@@ -93,10 +107,12 @@ namespace MauiApp3.ViewModels
             IsDrawerOpen = !IsDrawerOpen;
         }
 
-        private async Task UploadModel()
+        private async Task UploadModelAsync()
         {
             try
             {
+                Console.WriteLine("UploadModel: Starting file picker...");
+                
                 var customFileType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
                     { DevicePlatform.WinUI, new[] { ".stl", ".3mf" } },
@@ -112,12 +128,20 @@ namespace MauiApp3.ViewModels
                     FileTypes = customFileType
                 });
 
+                Console.WriteLine($"UploadModel: File picker result: {(result != null ? result.FileName : "null")}");
+
                 if (result == null)
+                {
+                    Console.WriteLine("UploadModel: User cancelled or no file selected");
                     return;
+                }
+
+                Console.WriteLine($"UploadModel: Selected file: {result.FullPath}");
 
                 // Validate file format
                 if (!_model3DService.IsSupportedFormat(result.FileName))
                 {
+                    Console.WriteLine($"UploadModel: Unsupported format: {result.FileName}");
                     await ShowAlertAsync("Error", "Unsupported file format. Please select an STL or 3MF file.");
                     return;
                 }
@@ -127,6 +151,7 @@ namespace MauiApp3.ViewModels
 
                 try
                 {
+                    Console.WriteLine("UploadModel: Creating file info...");
                     var fileInfo = new FileInfo(result.FullPath);
                     var extension = Path.GetExtension(result.FileName).ToUpperInvariant().TrimStart('.');
 
@@ -139,21 +164,32 @@ namespace MauiApp3.ViewModels
                         UploadedDate = DateTime.Now
                     };
 
-                    // Load and parse the 3D model in parallel with thumbnail generation
+                    Console.WriteLine($"UploadModel: Parsing {extension} file...");
+                    // Load and parse the 3D model
                     model.ParsedModel = await _model3DService.LoadModelAsync(result.FullPath);
                     
                     if (model.ParsedModel == null)
                     {
+                        Console.WriteLine("UploadModel: Failed to parse file");
                         await ShowAlertAsync("Error", $"Failed to parse {extension} file. The file may be corrupted or invalid.");
                         return;
                     }
 
+                    Console.WriteLine($"UploadModel: Successfully parsed {model.ParsedModel.Triangles.Count} triangles");
+                    Console.WriteLine("UploadModel: Generating thumbnail...");
+                    
                     // Generate thumbnail asynchronously
                     model.ThumbnailData = await _model3DService.GenerateThumbnailAsync(result.FullPath, model.ParsedModel);
 
+                    Console.WriteLine("UploadModel: Adding model to collection...");
                     Models.Add(model);
                     SelectedModel = model;
 
+                    Console.WriteLine("UploadModel: Saving to database...");
+                    // Save to database
+                    await SaveModelToDatabaseAsync(model);
+
+                    Console.WriteLine("UploadModel: Upload complete!");
                     await ShowAlertAsync("Success", $"Model '{model.Name}' loaded successfully!\nTriangles: {model.ParsedModel.Triangles.Count:N0}");
                 }
                 finally
@@ -164,17 +200,20 @@ namespace MauiApp3.ViewModels
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"UploadModel: Exception occurred: {ex.Message}");
+                Console.WriteLine($"UploadModel: Stack trace: {ex.StackTrace}");
                 IsLoading = false;
                 ((Command)UploadModelCommand).ChangeCanExecute();
-                await ShowAlertAsync("Error", $"Failed to upload model: {ex.Message}");
+                await ShowAlertAsync("Error", $"Failed to upload model: {ex.Message}\n\nDetails: {ex.GetType().Name}");
             }
         }
 
         private Task ShowAlertAsync(string title, string message)
         {
-            if (Application.Current?.MainPage != null)
+            // Use Shell.Current instead of deprecated Application.MainPage
+            if (Shell.Current?.CurrentPage != null)
             {
-                return Application.Current.MainPage.DisplayAlert(title, message, "OK");
+                return Shell.Current.CurrentPage.DisplayAlert(title, message, "OK");
             }
             return Task.CompletedTask;
         }
@@ -187,7 +226,7 @@ namespace MauiApp3.ViewModels
             }
         }
 
-        private void DeleteModel(Model3DFile? model)
+        private async void DeleteModel(Model3DFile? model)
         {
             if (model == null)
                 return;
@@ -196,10 +235,14 @@ namespace MauiApp3.ViewModels
             {
                 SelectedModel = null;
             }
+            
             Models.Remove(model);
+            
+            // Delete from database
+            await DeleteModelFromDatabaseAsync(model.Id);
         }
 
-        private void AddTag()
+        private async void AddTag()
         {
             if (SelectedModel == null || string.IsNullOrWhiteSpace(NewTagText))
                 return;
@@ -219,11 +262,14 @@ namespace MauiApp3.ViewModels
                 AllTags.Add(trimmedTag);
             }
 
+            // Save to database
+            await SaveModelToDatabaseAsync(SelectedModel);
+
             // Clear input
             NewTagText = string.Empty;
         }
 
-        private void RemoveTag(string? tag)
+        private async void RemoveTag(string? tag)
         {
             if (SelectedModel == null || string.IsNullOrEmpty(tag))
                 return;
@@ -235,6 +281,9 @@ namespace MauiApp3.ViewModels
             {
                 AllTags.Remove(tag);
             }
+
+            // Save to database
+            await SaveModelToDatabaseAsync(SelectedModel);
         }
 
         private async Task OpenDetailView(Model3DFile? model)
@@ -246,6 +295,71 @@ namespace MauiApp3.ViewModels
             {
                 { "Model", model }
             });
+        }
+
+        private async Task LoadDataFromDatabaseAsync()
+        {
+            try
+            {
+                IsLoading = true;
+
+                // Load models from database
+                var savedModels = await _databaseService.GetAllModelsAsync();
+
+                foreach (var model in savedModels)
+                {
+                    Models.Add(model);
+
+                    // Rebuild tag list
+                    foreach (var tag in model.Tags)
+                    {
+                        if (!AllTags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            AllTags.Add(tag);
+                        }
+                    }
+                }
+
+                // If no models, load sample data for first run
+                if (Models.Count == 0)
+                {
+                    await LoadSampleDataAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading data from database: {ex.Message}");
+                // Fallback to sample data on error
+                await LoadSampleDataAsync();
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private async Task SaveModelToDatabaseAsync(Model3DFile model)
+        {
+            try
+            {
+                await _databaseService.SaveModelAsync(model);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving model to database: {ex.Message}");
+            }
+        }
+
+        private async Task DeleteModelFromDatabaseAsync(string modelId)
+        {
+            try
+            {
+                await _databaseService.DeleteModelAsync(modelId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting model from database: {ex.Message}");
+            }
         }
 
         private async Task LoadSampleDataAsync()
@@ -281,6 +395,9 @@ namespace MauiApp3.ViewModels
                 model.ThumbnailData = await _model3DService.GenerateThumbnailAsync("", null);
                 
                 Models.Add(model);
+
+                // Save sample model to database
+                await SaveModelToDatabaseAsync(model);
             }
         }
 
