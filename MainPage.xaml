@@ -1,0 +1,584 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:MauiApp3.ViewModels"
+             xmlns:models="clr-namespace:MauiApp3.Models"
+             xmlns:converters="clr-namespace:MauiApp3.Converters"
+             xmlns:controls="clr-namespace:MauiApp3.Controls"
+             xmlns:behaviors="clr-namespace:MauiApp3.Behaviors"
+             x:Class="MauiApp3.MainPage"
+             x:DataType="viewmodels:MainViewModel">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:FileSizeConverter x:Key="FileSizeConverter"/>
+            <converters:BoolToWidthConverter x:Key="BoolToWidthConverter"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid>
+        <!-- Main Grid with 3 columns: Drawer, Model Grid (larger), Renderer (smaller) -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{Binding DrawerWidth}"/>
+            <ColumnDefinition Width="3*"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT DRAWER -->
+        <Grid Grid.Column="0" 
+              BackgroundColor="#2C2C2C"
+              IsVisible="{Binding IsDrawerOpen}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Drawer Header -->
+            <VerticalStackLayout Grid.Row="0" 
+                               Padding="20"
+                               BackgroundColor="#1E1E1E">
+                <Label Text="3D Model Manager"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       Margin="0,0,0,10"/>
+                
+                <BoxView HeightRequest="1" 
+                         BackgroundColor="#444444"/>
+            </VerticalStackLayout>
+
+            <!-- Drawer Content -->
+            <ScrollView Grid.Row="1" Padding="15">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Library Statistics"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           Margin="0,0,0,10"/>
+
+                    <Frame BackgroundColor="#3C3C3C" 
+                           Padding="15"
+                           CornerRadius="8"
+                           HasShadow="False">
+                        <VerticalStackLayout Spacing="8">
+                            <Label TextColor="#CCCCCC">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Total Models: " FontAttributes="Bold"/>
+                                        <Span Text="{Binding Models.Count}"/>
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            
+
+                            <Label Text="Quick Actions"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   Margin="0,10,0,5"/>
+                            
+
+                            <Button Text="📁 Upload Model"
+                                    Command="{Binding UploadModelCommand}"
+                                    BackgroundColor="#0078D4"
+                                    TextColor="White"
+                                    CornerRadius="6"
+                                    Padding="10"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <Label Text="File Filters"
+                           FontSize="14"
+                           TextColor="#AAAAAA"
+                           Margin="0,10,0,5"/>
+
+                    <Frame BackgroundColor="#3C3C3C" 
+                           Padding="10"
+                           CornerRadius="8"
+                           HasShadow="False">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="⬜ All Files"
+                                   TextColor="White"
+                                   Padding="5"/>
+                            <Label Text="🔹 STL Files"
+                                   TextColor="#CCCCCC"
+                                   Padding="5"/>
+                            <Label Text="🔸 3MF Files"
+                                   TextColor="#CCCCCC"
+                                   Padding="5"/>
+                        </VerticalStackLayout>
+                    </Frame>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Drawer Footer -->
+            <VerticalStackLayout Grid.Row="2" 
+                               Padding="15"
+                               BackgroundColor="#1E1E1E">
+                <BoxView HeightRequest="1" 
+                         BackgroundColor="#444444"
+                         Margin="0,0,0,10"/>
+                <Label Text="© 2024 3D Viewer"
+                       FontSize="12"
+                       TextColor="#888888"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- CENTER - MODEL GRID (Now larger) -->
+        <Grid Grid.Column="1" 
+              BackgroundColor="#1E1E1E"
+              Padding="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header with Toggle Button -->
+            <Grid Grid.Row="0" 
+                  Padding="10"
+                  BackgroundColor="#2C2C2C"
+                  Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Text="☰"
+                        Command="{Binding ToggleDrawerCommand}"
+                        BackgroundColor="#3C3C3C"
+                        TextColor="White"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        CornerRadius="6"
+                        Padding="0"
+                        Margin="0,0,10,0"/>
+
+                <Label Grid.Column="1"
+                       Text="3D Models Library"
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="White"
+                       VerticalOptions="Center"/>
+            </Grid>
+
+            <!-- Models Grid -->
+            <ScrollView Grid.Row="1">
+                <CollectionView ItemsSource="{Binding Models}"
+                               SelectionMode="Single"
+                               SelectedItem="{Binding SelectedModel}"
+                               SelectionChangedCommand="{Binding SelectModelCommand}"
+                               SelectionChangedCommandParameter="{Binding SelectedModel}">
+                    <CollectionView.ItemsLayout>
+                        <GridItemsLayout Orientation="Vertical"
+                                       Span="3"
+                                       HorizontalItemSpacing="10"
+                                       VerticalItemSpacing="10"/>
+                    </CollectionView.ItemsLayout>
+                    
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:Model3DFile">
+                            <Frame BackgroundColor="#2C2C2C"
+                                   Padding="15"
+                                   CornerRadius="10"
+                                   HasShadow="True"
+                                   BorderColor="#0078D4">
+                                <Frame.Triggers>
+                                    <DataTrigger TargetType="Frame"
+                                               Binding="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=SelectedModel.Id}"
+                                               Value="{Binding Id}">
+                                        <Setter Property="BorderColor" Value="#0078D4"/>
+                                        <Setter Property="BackgroundColor" Value="#3C3C3C"/>
+                                    </DataTrigger>
+                                </Frame.Triggers>
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer NumberOfTapsRequired="2"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=OpenDetailCommand}"
+                                                        CommandParameter="{Binding .}"/>
+                                </Frame.GestureRecognizers>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="100"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Thumbnail with generated image or placeholder -->
+                                    <Frame Grid.Row="0"
+                                           BackgroundColor="#1E1E1E"
+                                           Padding="0"
+                                           CornerRadius="6"
+                                           HasShadow="False">
+                                        <Grid>
+                                            <!-- Thumbnail Image -->
+                                            <Image Source="{Binding ThumbnailData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
+                                                   Aspect="AspectFit"
+                                                   HorizontalOptions="Fill"
+                                                   VerticalOptions="Fill"
+                                                   IsVisible="{Binding ThumbnailData, Converter={StaticResource IsNotNullConverter}}"/>
+                                            
+                                            <!-- Fallback placeholder if no thumbnail -->
+                                            <Label Text="🎲"
+                                                   FontSize="50"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center"
+                                                   TextColor="#666666"
+                                                   IsVisible="{Binding ThumbnailData, Converter={StaticResource IsNullConverter}}"/>
+                                        </Grid>
+                                    </Frame>
+
+                                    <!-- File Name -->
+                                    <Label Grid.Row="1"
+                                           Text="{Binding Name}"
+                                           FontSize="14"
+                                           FontAttributes="Bold"
+                                           TextColor="White"
+                                           LineBreakMode="TailTruncation"
+                                           Margin="0,10,0,5"/>
+
+                                    <!-- File Type Badge -->
+                                    <HorizontalStackLayout Grid.Row="2" Spacing="5" Margin="0,0,0,5">
+                                        <Frame BackgroundColor="#0078D4"
+                                               Padding="5,2"
+                                               CornerRadius="4"
+                                               HasShadow="False">
+                                            <Label Text="{Binding FileType}"
+                                                   FontSize="10"
+                                                   FontAttributes="Bold"
+                                                   TextColor="White"/>
+                                        </Frame>
+                                        <Label Text="{Binding FileSize, Converter={StaticResource FileSizeConverter}}"
+                                               FontSize="12"
+                                               TextColor="#AAAAAA"
+                                               VerticalOptions="Center"/>
+                                    </HorizontalStackLayout>
+
+                                    <!-- Tags Display -->
+                                    <FlexLayout Grid.Row="3"
+                                               Wrap="Wrap"
+                                               Direction="Row"
+                                               JustifyContent="Start"
+                                               Margin="0,5,0,5">
+                                        <BindableLayout.ItemsSource>
+                                            <Binding Path="Tags"/>
+                                        </BindableLayout.ItemsSource>
+                                        <BindableLayout.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <Frame BackgroundColor="#0078D4"
+                                                       Padding="10,5"
+                                                       CornerRadius="12"
+                                                       HasShadow="False"
+                                                       Margin="3,2">
+                                                    <Label Text="{Binding .}"
+                                                           FontSize="12"
+                                                           FontAttributes="Bold"
+                                                           TextColor="White"/>
+                                                </Frame>
+                                            </DataTemplate>
+                                        </BindableLayout.ItemTemplate>
+                                    </FlexLayout>
+
+                                    <!-- Upload Date -->
+                                    <Label Grid.Row="4"
+                                           Text="{Binding UploadedDate, StringFormat='Uploaded: {0:MM/dd/yyyy}'}"
+                                           FontSize="11"
+                                           TextColor="#888888"/>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout HorizontalOptions="Center"
+                                           VerticalOptions="Center"
+                                           Padding="20">
+                            <Label Text="📂"
+                                   FontSize="60"
+                                   HorizontalOptions="Center"
+                                   TextColor="#666666"/>
+                            <Label Text="No 3D models uploaded yet"
+                                   FontSize="16"
+                                   TextColor="#AAAAAA"
+                                   HorizontalOptions="Center"
+                                   Margin="0,10,0,0"/>
+                            <Button Text="Upload Your First Model"
+                                    Command="{Binding UploadModelCommand}"
+                                    BackgroundColor="#0078D4"
+                                    TextColor="White"
+                                    Margin="0,20,0,0"
+                                    CornerRadius="6"
+                                    Padding="15,10"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </ScrollView>
+        </Grid>
+
+        <!-- RIGHT - 3D RENDERER (Now smaller) -->
+        <Grid Grid.Column="2" 
+              BackgroundColor="#252525"
+              Padding="15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Renderer Header -->
+            <Frame Grid.Row="0"
+                   BackgroundColor="#2C2C2C"
+                   Padding="15"
+                   CornerRadius="8"
+                   HasShadow="False"
+                   Margin="0,0,0,15">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="3D Renderer"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="White"/>
+                        <Label Text="{Binding SelectedModel.Name, StringFormat='Preview: {0}'}"
+                               FontSize="12"
+                               TextColor="#AAAAAA"
+                               IsVisible="{Binding SelectedModel, Converter={StaticResource IsNotNullConverter}}"/>
+                    </VerticalStackLayout>
+
+                    <HorizontalStackLayout Grid.Column="1" Spacing="8">
+                        <Button x:Name="ResetViewButton"
+                                Text="🔄"
+                                Clicked="OnResetViewClicked"
+                                BackgroundColor="#3C3C3C"
+                                TextColor="White"
+                                WidthRequest="40"
+                                HeightRequest="40"
+                                CornerRadius="6"
+                                Padding="0"
+                                ToolTipProperties.Text="Reset View"/>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Frame>
+
+            <!-- 3D Viewer Area -->
+            <Frame Grid.Row="1"
+                   BackgroundColor="#1A1A1A"
+                   Padding="0"
+                   CornerRadius="10"
+                   HasShadow="False"
+                   BorderColor="#444444">
+                <Grid>
+                    <!-- Empty state -->
+                    <VerticalStackLayout HorizontalOptions="Center"
+                                       VerticalOptions="Center"
+                                       IsVisible="{Binding SelectedModel, Converter={StaticResource IsNullConverter}}">
+                        <Label Text="🎲"
+                               FontSize="80"
+                               TextColor="#444444"
+                               HorizontalOptions="Center"/>
+                        <Label Text="Select a model to view"
+                               FontSize="16"
+                               TextColor="#666666"
+                               HorizontalOptions="Center"
+                               Margin="0,20,0,0"/>
+                    </VerticalStackLayout>
+
+                    <!-- 3D Viewer Control -->
+                    <controls:Model3DViewer x:Name="Model3DViewer"
+                                          BackgroundColor="#1A1A1A"
+                                          IsVisible="{Binding SelectedModel, Converter={StaticResource IsNotNullConverter}}"/>
+
+                    <!-- Loading Indicator -->
+                    <ActivityIndicator IsRunning="{Binding IsLoading}"
+                                     IsVisible="{Binding IsLoading}"
+                                     Color="#0078D4"
+                                     WidthRequest="50"
+                                     HeightRequest="50"
+                                     HorizontalOptions="Center"
+                                     VerticalOptions="Center"/>
+                </Grid>
+            </Frame>
+
+            <!-- Model Info Panel -->
+            <ScrollView Grid.Row="2"
+                       Margin="0,15,0,0"
+                       MaximumHeightRequest="300"
+                       IsVisible="{Binding SelectedModel, Converter={StaticResource IsNotNullConverter}}">
+                <Frame BackgroundColor="#2C2C2C"
+                       Padding="15"
+                       CornerRadius="8"
+                       HasShadow="False">
+                    <VerticalStackLayout Spacing="15">
+                        <!-- File Information and Actions Row -->
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <VerticalStackLayout Grid.Row="0" Grid.Column="0" Spacing="5">
+                                <Label Text="File Information"
+                                       FontSize="14"
+                                       FontAttributes="Bold"
+                                       TextColor="White"/>
+                                <Label TextColor="#CCCCCC" FontSize="12">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="Type: "/>
+                                            <Span Text="{Binding SelectedModel.FileType}" FontAttributes="Bold"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label TextColor="#CCCCCC" FontSize="12">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="Size: "/>
+                                            <Span Text="{Binding SelectedModel.FileSize, Converter={StaticResource FileSizeConverter}}" FontAttributes="Bold"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label TextColor="#CCCCCC" FontSize="12"
+                                       IsVisible="{Binding SelectedModel.ParsedModel, Converter={StaticResource IsNotNullConverter}}">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="Triangles: "/>
+                                            <Span Text="{Binding SelectedModel.ParsedModel.Triangles.Count}" FontAttributes="Bold"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                            </VerticalStackLayout>
+
+                            <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="5">
+                                <Label Text="Actions"
+                                       FontSize="14"
+                                       FontAttributes="Bold"
+                                       TextColor="White"/>
+                                <HorizontalStackLayout Spacing="5">
+                                    <Button Text="Export"
+                                            FontSize="11"
+                                            BackgroundColor="#0078D4"
+                                            TextColor="White"
+                                            CornerRadius="4"
+                                            Padding="10,5"/>
+                                    <Button Text="Delete"
+                                            FontSize="11"
+                                            Command="{Binding DeleteModelCommand}"
+                                            CommandParameter="{Binding SelectedModel}"
+                                            BackgroundColor="#C42B1C"
+                                            TextColor="White"
+                                            CornerRadius="4"
+                                            Padding="10,5"/>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" 
+                                 BackgroundColor="#444444"/>
+
+                        <!-- Tags Management Section -->
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="Tags"
+                                   FontSize="14"
+                                   FontAttributes="Bold"
+                                   TextColor="White"/>
+
+                            <!-- Tag Input -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                <Entry Grid.Column="0"
+                                       Text="{Binding NewTagText}"
+                                       Placeholder="Add new tag..."
+                                       PlaceholderColor="#888888"
+                                       TextColor="White"
+                                       BackgroundColor="#3C3C3C"
+                                       FontSize="12"
+                                       HeightRequest="34"
+                                       ReturnCommand="{Binding AddTagCommand}"/>
+                                <Button Grid.Column="1"
+                                        Text="+"
+                                        Command="{Binding AddTagCommand}"
+                                        BackgroundColor="#0078D4"
+                                        TextColor="White"
+                                        WidthRequest="34"
+                                        HeightRequest="34"
+                                        CornerRadius="4"
+                                        Padding="0"
+                                        FontSize="18"
+                                        FontAttributes="Bold"/>
+                            </Grid>
+
+                            <!-- Tags Display -->
+                            <FlexLayout Wrap="Wrap"
+                                       Direction="Row"
+                                       JustifyContent="Start"
+                                       Margin="0,5,0,0">
+                                <BindableLayout.ItemsSource>
+                                    <Binding Path="SelectedModel.Tags"/>
+                                </BindableLayout.ItemsSource>
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Frame BackgroundColor="#0078D4"
+                                               Padding="8,4"
+                                               CornerRadius="12"
+                                               HasShadow="False"
+                                               Margin="3,2">
+                                            <HorizontalStackLayout Spacing="6">
+                                                <Label Text="{Binding .}"
+                                                       FontSize="11"
+                                                       FontAttributes="Bold"
+                                                       TextColor="White"
+                                                       VerticalOptions="Center"/>
+                                                <Label Text="×"
+                                                       FontSize="16"
+                                                       FontAttributes="Bold"
+                                                       TextColor="White"
+                                                       VerticalOptions="Center">
+                                                    <Label.GestureRecognizers>
+                                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=RemoveTagCommand}"
+                                                                            CommandParameter="{Binding .}"/>
+                                                    </Label.GestureRecognizers>
+                                                </Label>
+                                            </HorizontalStackLayout>
+                                        </Frame>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                                <BindableLayout.EmptyViewTemplate>
+                                    <DataTemplate>
+                                        <Label Text="No tags yet. Add some!"
+                                               FontSize="11"
+                                               TextColor="#888888"
+                                               FontAttributes="Italic"
+                                               Margin="5"/>
+                                    </DataTemplate>
+                                </BindableLayout.EmptyViewTemplate>
+                            </FlexLayout>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
+            </ScrollView>
+        </Grid>
+
+        <!-- Vertical Separators -->
+        <BoxView Grid.Column="0"
+                 WidthRequest="1"
+                 BackgroundColor="#444444"
+                 HorizontalOptions="End"
+                 IsVisible="{Binding IsDrawerOpen}"/>
+        
+        <BoxView Grid.Column="1"
+                 WidthRequest="1"
+                 BackgroundColor="#444444"
+                 HorizontalOptions="End"/>
+    </Grid>
+
+</ContentPage>

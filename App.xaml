@@ -1,0 +1,22 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:MauiApp3"
+             xmlns:converters="clr-namespace:MauiApp3.Converters"
+             x:Class="MauiApp3.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            
+            <!-- Global Converters -->
+            <converters:FileSizeConverter x:Key="FileSizeConverter"/>
+            <converters:BoolToWidthConverter x:Key="BoolToWidthConverter"/>
+            <converters:IsNullConverter x:Key="IsNullConverter"/>
+            <converters:IsNotNullConverter x:Key="IsNotNullConverter"/>
+            <converters:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
