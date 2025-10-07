@@ -22,28 +22,13 @@ namespace MauiApp3.ViewModels
         public bool IsDrawerOpen
         {
             get => _isDrawerOpen;
-            set
-            {
-                if (_isDrawerOpen != value)
-                {
-                    _isDrawerOpen = value;
-                    OnPropertyChanged();
-                    DrawerWidth = value ? 250 : 0;
-                }
-            }
+            set => SetProperty(ref _isDrawerOpen, value, () => DrawerWidth = value ? 250 : 0);
         }
 
         public double DrawerWidth
         {
             get => _drawerWidth;
-            set
-            {
-                if (_drawerWidth != value)
-                {
-                    _drawerWidth = value;
-                    OnPropertyChanged();
-                }
-            }
+            set => SetProperty(ref _drawerWidth, value);
         }
 
         public Model3DFile? SelectedModel
@@ -51,11 +36,11 @@ namespace MauiApp3.ViewModels
             get => _selectedModel;
             set
             {
-                if (_selectedModel != value)
+                if (SetProperty(ref _selectedModel, value))
                 {
-                    _selectedModel = value;
-                    OnPropertyChanged();
-                    NewTagText = string.Empty; // Reset tag input when model changes
+                    NewTagText = string.Empty;
+                    // Update CanExecute when selected model changes
+                    ((Command)AddTagCommand).ChangeCanExecute();
                 }
             }
         }
@@ -63,14 +48,7 @@ namespace MauiApp3.ViewModels
         public bool IsLoading
         {
             get => _isLoading;
-            set
-            {
-                if (_isLoading != value)
-                {
-                    _isLoading = value;
-                    OnPropertyChanged();
-                }
-            }
+            set => SetProperty(ref _isLoading, value);
         }
 
         public string NewTagText
@@ -78,10 +56,10 @@ namespace MauiApp3.ViewModels
             get => _newTagText;
             set
             {
-                if (_newTagText != value)
+                if (SetProperty(ref _newTagText, value))
                 {
-                    _newTagText = value;
-                    OnPropertyChanged();
+                    // Update CanExecute when text changes
+                    ((Command)AddTagCommand).ChangeCanExecute();
                 }
             }
         }
@@ -99,15 +77,15 @@ namespace MauiApp3.ViewModels
             _model3DService = model3DService;
             
             ToggleDrawerCommand = new Command(ToggleDrawer);
-            UploadModelCommand = new Command(async () => await UploadModel());
+            UploadModelCommand = new Command(async () => await UploadModel(), () => !IsLoading);
             SelectModelCommand = new Command<Model3DFile>(SelectModel);
             DeleteModelCommand = new Command<Model3DFile>(DeleteModel);
-            AddTagCommand = new Command(AddTag);
+            AddTagCommand = new Command(AddTag, () => SelectedModel != null && !string.IsNullOrWhiteSpace(NewTagText));
             RemoveTagCommand = new Command<string>(RemoveTag);
             OpenDetailCommand = new Command<Model3DFile>(async (model) => await OpenDetailView(model));
 
-            // Add sample data
-            LoadSampleData();
+            // Load sample data asynchronously
+            _ = LoadSampleDataAsync();
         }
 
         private void ToggleDrawer()
@@ -119,30 +97,36 @@ namespace MauiApp3.ViewModels
         {
             try
             {
+                var customFileType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, new[] { ".stl", ".3mf" } },
+                    { DevicePlatform.macOS, new[] { "stl", "3mf" } },
+                    { DevicePlatform.MacCatalyst, new[] { "stl", "3mf" } },
+                    { DevicePlatform.iOS, new[] { "public.item" } },
+                    { DevicePlatform.Android, new[] { "*/*" } }
+                });
+
                 var result = await FilePicker.PickAsync(new PickOptions
                 {
                     PickerTitle = "Select 3D Model File",
-                    FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-                    {
-                        { DevicePlatform.WinUI, new[] { ".stl", ".3mf" } },
-                        { DevicePlatform.macOS, new[] { "stl", "3mf" } },
-                        { DevicePlatform.MacCatalyst, new[] { "stl", "3mf" } },
-                        { DevicePlatform.iOS, new[] { "public.item" } },
-                        { DevicePlatform.Android, new[] { "*/*" } }
-                    })
+                    FileTypes = customFileType
                 });
 
-                if (result != null)
+                if (result == null)
+                    return;
+
+                // Validate file format
+                if (!_model3DService.IsSupportedFormat(result.FileName))
                 {
-                    // Validate file format
-                    if (!_model3DService.IsSupportedFormat(result.FileName))
-                    {
-                        await ShowAlert("Error", "Unsupported file format. Please select an STL or 3MF file.");
-                        return;
-                    }
+                    await ShowAlertAsync("Error", "Unsupported file format. Please select an STL or 3MF file.");
+                    return;
+                }
 
-                    IsLoading = true;
+                IsLoading = true;
+                ((Command)UploadModelCommand).ChangeCanExecute();
 
+                try
+                {
                     var fileInfo = new FileInfo(result.FullPath);
                     var extension = Path.GetExtension(result.FileName).ToUpperInvariant().TrimStart('.');
 
@@ -155,52 +139,59 @@ namespace MauiApp3.ViewModels
                         UploadedDate = DateTime.Now
                     };
 
-                    // Load and parse the 3D model (supports both STL and 3MF)
+                    // Load and parse the 3D model in parallel with thumbnail generation
                     model.ParsedModel = await _model3DService.LoadModelAsync(result.FullPath);
                     
                     if (model.ParsedModel == null)
                     {
-                        await ShowAlert("Error", $"Failed to parse {extension} file. The file may be corrupted or invalid.");
-                        IsLoading = false;
+                        await ShowAlertAsync("Error", $"Failed to parse {extension} file. The file may be corrupted or invalid.");
                         return;
                     }
 
-                    // Generate thumbnail from the parsed model
+                    // Generate thumbnail asynchronously
                     model.ThumbnailData = await _model3DService.GenerateThumbnailAsync(result.FullPath, model.ParsedModel);
 
                     Models.Add(model);
                     SelectedModel = model;
 
+                    await ShowAlertAsync("Success", $"Model '{model.Name}' loaded successfully!\nTriangles: {model.ParsedModel.Triangles.Count:N0}");
+                }
+                finally
+                {
                     IsLoading = false;
-                    await ShowAlert("Success", $"Model '{model.Name}' loaded successfully!\nTriangles: {model.ParsedModel?.Triangles.Count ?? 0}");
+                    ((Command)UploadModelCommand).ChangeCanExecute();
                 }
             }
             catch (Exception ex)
             {
                 IsLoading = false;
-                await ShowAlert("Error", $"Failed to upload model: {ex.Message}");
+                ((Command)UploadModelCommand).ChangeCanExecute();
+                await ShowAlertAsync("Error", $"Failed to upload model: {ex.Message}");
             }
         }
 
-        private async Task ShowAlert(string title, string message)
+        private Task ShowAlertAsync(string title, string message)
         {
-            if (Application.Current?.Windows.Count > 0)
+            if (Application.Current?.MainPage != null)
             {
-                var window = Application.Current.Windows[0];
-                if (window.Page != null)
-                {
-                    await window.Page.DisplayAlert(title, message, "OK");
-                }
+                return Application.Current.MainPage.DisplayAlert(title, message, "OK");
+            }
+            return Task.CompletedTask;
+        }
+
+        private void SelectModel(Model3DFile? model)
+        {
+            if (model != null)
+            {
+                SelectedModel = model;
             }
         }
 
-        private void SelectModel(Model3DFile model)
+        private void DeleteModel(Model3DFile? model)
         {
-            SelectedModel = model;
-        }
+            if (model == null)
+                return;
 
-        private void DeleteModel(Model3DFile model)
-        {
             if (SelectedModel == model)
             {
                 SelectedModel = null;
@@ -215,15 +206,15 @@ namespace MauiApp3.ViewModels
 
             var trimmedTag = NewTagText.Trim();
             
-            // Check if tag already exists on this model
-            if (SelectedModel.Tags.Contains(trimmedTag, StringComparer.OrdinalIgnoreCase))
+            // Check if tag already exists (case-insensitive)
+            if (SelectedModel.Tags.Any(t => string.Equals(t, trimmedTag, StringComparison.OrdinalIgnoreCase)))
                 return;
 
             // Add tag to model
             SelectedModel.Tags.Add(trimmedTag);
 
             // Add to global tags list if not already there
-            if (!AllTags.Contains(trimmedTag, StringComparer.OrdinalIgnoreCase))
+            if (!AllTags.Any(t => string.Equals(t, trimmedTag, StringComparison.OrdinalIgnoreCase)))
             {
                 AllTags.Add(trimmedTag);
             }
@@ -232,7 +223,7 @@ namespace MauiApp3.ViewModels
             NewTagText = string.Empty;
         }
 
-        private void RemoveTag(string tag)
+        private void RemoveTag(string? tag)
         {
             if (SelectedModel == null || string.IsNullOrEmpty(tag))
                 return;
@@ -240,7 +231,7 @@ namespace MauiApp3.ViewModels
             SelectedModel.Tags.Remove(tag);
 
             // Remove from global tags if no model uses it anymore
-            if (!Models.Any(m => m.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)))
+            if (!Models.SelectMany(m => m.Tags).Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
             {
                 AllTags.Remove(tag);
             }
@@ -251,67 +242,60 @@ namespace MauiApp3.ViewModels
             if (model == null)
                 return;
 
-            var navigationParameter = new Dictionary<string, object>
+            await Shell.Current.GoToAsync(nameof(Pages.ModelDetailPage), new Dictionary<string, object>
             {
                 { "Model", model }
-            };
-
-            await Shell.Current.GoToAsync($"{nameof(MauiApp3.Pages.ModelDetailPage)}", navigationParameter);
+            });
         }
 
-        private void LoadSampleData()
+        private async Task LoadSampleDataAsync()
         {
-            // Add sample models for demonstration (with placeholder thumbnails)
-            var cubeModel = new Model3DFile
+            // Generate sample data without blocking
+            var sampleModels = new[]
             {
-                Name = "sample_cube.stl",
-                FileType = "STL",
-                FileSize = 102400,
-                UploadedDate = DateTime.Now.AddDays(-2),
-                ThumbnailData = _model3DService.GenerateThumbnailAsync("", null).Result
+                new { Name = "sample_cube.stl", Type = "STL", Size = 102400L, Days = -2, Tags = new[] { "geometric", "simple" } },
+                new { Name = "sphere_model.3mf", Type = "3MF", Size = 256000L, Days = -1, Tags = new[] { "geometric", "round" } },
+                new { Name = "complex_part.stl", Type = "STL", Size = 512000L, Days = 0, Tags = new[] { "mechanical", "complex" } }
             };
-            cubeModel.Tags.Add("geometric");
-            cubeModel.Tags.Add("simple");
-            Models.Add(cubeModel);
 
-            var sphereModel = new Model3DFile
+            foreach (var sample in sampleModels)
             {
-                Name = "sphere_model.3mf",
-                FileType = "3MF",
-                FileSize = 256000,
-                UploadedDate = DateTime.Now.AddDays(-1),
-                ThumbnailData = _model3DService.GenerateThumbnailAsync("", null).Result
-            };
-            sphereModel.Tags.Add("geometric");
-            sphereModel.Tags.Add("round");
-            Models.Add(sphereModel);
-
-            var complexModel = new Model3DFile
-            {
-                Name = "complex_part.stl",
-                FileType = "STL",
-                FileSize = 512000,
-                UploadedDate = DateTime.Now.AddHours(-3),
-                ThumbnailData = _model3DService.GenerateThumbnailAsync("", null).Result
-            };
-            complexModel.Tags.Add("mechanical");
-            complexModel.Tags.Add("complex");
-            Models.Add(complexModel);
-
-            // Build initial tag list
-            foreach (var model in Models)
-            {
-                foreach (var tag in model.Tags)
+                var model = new Model3DFile
                 {
-                    if (!AllTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                    Name = sample.Name,
+                    FileType = sample.Type,
+                    FileSize = sample.Size,
+                    UploadedDate = DateTime.Now.AddDays(sample.Days)
+                };
+
+                foreach (var tag in sample.Tags)
+                {
+                    model.Tags.Add(tag);
+                    if (!AllTags.Contains(tag))
                     {
                         AllTags.Add(tag);
                     }
                 }
+
+                // Generate placeholder thumbnail asynchronously
+                model.ThumbnailData = await _model3DService.GenerateThumbnailAsync("", null);
+                
+                Models.Add(model);
             }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected bool SetProperty<T>(ref T field, T value, Action? onChanged = null, [CallerMemberName] string? propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return false;
+
+            field = value;
+            onChanged?.Invoke();
+            OnPropertyChanged(propertyName);
+            return true;
+        }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {

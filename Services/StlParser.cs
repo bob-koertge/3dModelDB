@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Numerics;
 using System.Text;
 
@@ -5,6 +6,7 @@ namespace MauiApp3.Services
 {
     /// <summary>
     /// Parser for STL (Stereolithography) files - supports both ASCII and Binary formats
+    /// Optimized for performance and memory efficiency
     /// </summary>
     public class StlParser
     {
@@ -25,20 +27,42 @@ namespace MauiApp3.Services
             public float Scale { get; set; } = 1.0f;
         }
 
+        private const int BinaryHeaderSize = 80;
+        private const int BinaryTriangleSize = 50;
+
         public async Task<StlModel?> ParseFileAsync(string filePath)
         {
             try
             {
-                byte[] fileBytes = await File.ReadAllBytesAsync(filePath);
+                // Use FileStream for better memory management with large files
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
                 
-                // Check if binary or ASCII
-                if (IsBinaryStl(fileBytes))
+                // Read header to determine format
+                byte[] header = ArrayPool<byte>.Shared.Rent(84);
+                try
                 {
-                    return ParseBinaryStl(fileBytes);
+                    int bytesRead = await fileStream.ReadAsync(header.AsMemory(0, 84));
+                    if (bytesRead < 84)
+                    {
+                        // File too small, try ASCII
+                        fileStream.Position = 0;
+                        return await ParseAsciiStlAsync(fileStream);
+                    }
+
+                    if (IsBinaryStl(header, (int)fileStream.Length))
+                    {
+                        fileStream.Position = 0;
+                        return await ParseBinaryStlAsync(fileStream);
+                    }
+                    else
+                    {
+                        fileStream.Position = 0;
+                        return await ParseAsciiStlAsync(fileStream);
+                    }
                 }
-                else
+                finally
                 {
-                    return ParseAsciiStl(fileBytes);
+                    ArrayPool<byte>.Shared.Return(header);
                 }
             }
             catch (Exception ex)
@@ -48,142 +72,138 @@ namespace MauiApp3.Services
             }
         }
 
-        private bool IsBinaryStl(byte[] data)
+        private bool IsBinaryStl(byte[] header, int fileLength)
         {
-            if (data.Length < 84) return false;
-            
             // Check if starts with "solid" (ASCII format)
-            string header = Encoding.ASCII.GetString(data, 0, Math.Min(80, data.Length));
-            if (header.TrimStart().StartsWith("solid", StringComparison.OrdinalIgnoreCase))
+            ReadOnlySpan<byte> solidBytes = "solid"u8;
+            ReadOnlySpan<byte> headerSpan = header.AsSpan(0, Math.Min(80, header.Length));
+            
+            // Trim leading whitespace
+            int start = 0;
+            while (start < headerSpan.Length && char.IsWhiteSpace((char)headerSpan[start]))
+                start++;
+
+            if (headerSpan.Slice(start).StartsWith(solidBytes))
             {
-                // Could still be binary with "solid" in header, check further
-                if (data.Length >= 84)
+                // Could still be binary, check triangle count
+                if (fileLength >= 84)
                 {
-                    uint triangleCount = BitConverter.ToUInt32(data, 80);
-                    long expectedSize = 84 + ((long)triangleCount * 50);
-                    return data.Length == expectedSize;
+                    uint triangleCount = BitConverter.ToUInt32(header, BinaryHeaderSize);
+                    long expectedSize = 84 + ((long)triangleCount * BinaryTriangleSize);
+                    return fileLength == expectedSize;
                 }
                 return false;
             }
             return true;
         }
 
-        private StlModel ParseBinaryStl(byte[] data)
+        private async Task<StlModel> ParseBinaryStlAsync(FileStream stream)
         {
             var model = new StlModel();
             
-            // Skip 80-byte header
-            int offset = 80;
+            // Read header and triangle count
+            byte[] header = new byte[84];
+            await stream.ReadAsync(header.AsMemory());
             
-            // Read number of triangles
-            uint triangleCount = BitConverter.ToUInt32(data, offset);
-            offset += 4;
+            uint triangleCount = BitConverter.ToUInt32(header, BinaryHeaderSize);
+            model.Triangles.Capacity = (int)triangleCount;
 
-            Vector3 min = new Vector3(float.MaxValue);
-            Vector3 max = new Vector3(float.MinValue);
+            Vector3 min = new(float.MaxValue);
+            Vector3 max = new(float.MinValue);
 
-            for (uint i = 0; i < triangleCount; i++)
+            // Read triangles in chunks for better performance
+            const int chunkSize = 100;
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(BinaryTriangleSize * chunkSize);
+            
+            try
             {
-                var triangle = new Triangle();
-                
-                // Normal vector (12 bytes)
-                triangle.Normal = new Vector3(
-                    BitConverter.ToSingle(data, offset),
-                    BitConverter.ToSingle(data, offset + 4),
-                    BitConverter.ToSingle(data, offset + 8)
-                );
-                offset += 12;
+                uint remaining = triangleCount;
+                while (remaining > 0)
+                {
+                    uint toRead = Math.Min(remaining, chunkSize);
+                    int bytesToRead = (int)(toRead * BinaryTriangleSize);
+                    
+                    await stream.ReadAsync(buffer.AsMemory(0, bytesToRead));
+                    
+                    for (uint i = 0; i < toRead; i++)
+                    {
+                        int offset = (int)(i * BinaryTriangleSize);
+                        
+                        var triangle = new Triangle
+                        {
+                            Normal = ReadVector3(buffer, offset),
+                            Vertex1 = ReadVector3(buffer, offset + 12),
+                            Vertex2 = ReadVector3(buffer, offset + 24),
+                            Vertex3 = ReadVector3(buffer, offset + 36)
+                        };
 
-                // Vertex 1 (12 bytes)
-                triangle.Vertex1 = new Vector3(
-                    BitConverter.ToSingle(data, offset),
-                    BitConverter.ToSingle(data, offset + 4),
-                    BitConverter.ToSingle(data, offset + 8)
-                );
-                offset += 12;
+                        model.Triangles.Add(triangle);
 
-                // Vertex 2 (12 bytes)
-                triangle.Vertex2 = new Vector3(
-                    BitConverter.ToSingle(data, offset),
-                    BitConverter.ToSingle(data, offset + 4),
-                    BitConverter.ToSingle(data, offset + 8)
-                );
-                offset += 12;
-
-                // Vertex 3 (12 bytes)
-                triangle.Vertex3 = new Vector3(
-                    BitConverter.ToSingle(data, offset),
-                    BitConverter.ToSingle(data, offset + 4),
-                    BitConverter.ToSingle(data, offset + 8)
-                );
-                offset += 12;
-
-                // Skip attribute byte count (2 bytes)
-                offset += 2;
-
-                model.Triangles.Add(triangle);
-
-                // Update bounds
-                UpdateBounds(ref min, ref max, triangle.Vertex1);
-                UpdateBounds(ref min, ref max, triangle.Vertex2);
-                UpdateBounds(ref min, ref max, triangle.Vertex3);
+                        // Update bounds
+                        min = Vector3.Min(min, Vector3.Min(triangle.Vertex1, Vector3.Min(triangle.Vertex2, triangle.Vertex3)));
+                        max = Vector3.Max(max, Vector3.Max(triangle.Vertex1, Vector3.Max(triangle.Vertex2, triangle.Vertex3)));
+                    }
+                    
+                    remaining -= toRead;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
             }
 
             CalculateModelProperties(model, min, max);
             return model;
         }
 
-        private StlModel ParseAsciiStl(byte[] data)
+        private Vector3 ReadVector3(byte[] buffer, int offset)
+        {
+            return new Vector3(
+                BitConverter.ToSingle(buffer, offset),
+                BitConverter.ToSingle(buffer, offset + 4),
+                BitConverter.ToSingle(buffer, offset + 8)
+            );
+        }
+
+        private async Task<StlModel> ParseAsciiStlAsync(FileStream stream)
         {
             var model = new StlModel();
-            string content = Encoding.ASCII.GetString(data);
-            var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            Vector3 min = new(float.MaxValue);
+            Vector3 max = new(float.MinValue);
 
-            Vector3 min = new Vector3(float.MaxValue);
-            Vector3 max = new Vector3(float.MinValue);
-
+            using var reader = new StreamReader(stream, Encoding.ASCII, detectEncodingFromByteOrderMarks: false, 4096);
+            
             Triangle? currentTriangle = null;
             int vertexIndex = 0;
 
-            foreach (var line in lines)
+            while (!reader.EndOfStream)
             {
-                var trimmed = line.Trim();
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var trimmed = line.AsSpan().Trim();
                 
                 if (trimmed.StartsWith("facet normal"))
                 {
                     currentTriangle = new Triangle();
-                    var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 5)
-                    {
-                        currentTriangle.Normal = new Vector3(
-                            float.Parse(parts[2]),
-                            float.Parse(parts[3]),
-                            float.Parse(parts[4])
-                        );
-                    }
+                    ParseNormal(trimmed, currentTriangle);
                     vertexIndex = 0;
                 }
                 else if (trimmed.StartsWith("vertex") && currentTriangle != null)
                 {
-                    var parts = trimmed.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 4)
+                    var vertex = ParseVertex(trimmed);
+                    
+                    switch (vertexIndex)
                     {
-                        var vertex = new Vector3(
-                            float.Parse(parts[1]),
-                            float.Parse(parts[2]),
-                            float.Parse(parts[3])
-                        );
-
-                        switch (vertexIndex)
-                        {
-                            case 0: currentTriangle.Vertex1 = vertex; break;
-                            case 1: currentTriangle.Vertex2 = vertex; break;
-                            case 2: currentTriangle.Vertex3 = vertex; break;
-                        }
-                        
-                        UpdateBounds(ref min, ref max, vertex);
-                        vertexIndex++;
+                        case 0: currentTriangle.Vertex1 = vertex; break;
+                        case 1: currentTriangle.Vertex2 = vertex; break;
+                        case 2: currentTriangle.Vertex3 = vertex; break;
                     }
+                    
+                    min = Vector3.Min(min, vertex);
+                    max = Vector3.Max(max, vertex);
+                    vertexIndex++;
                 }
                 else if (trimmed.StartsWith("endfacet") && currentTriangle != null)
                 {
@@ -196,21 +216,53 @@ namespace MauiApp3.Services
             return model;
         }
 
-        private void UpdateBounds(ref Vector3 min, ref Vector3 max, Vector3 vertex)
+        private void ParseNormal(ReadOnlySpan<char> line, Triangle triangle)
         {
-            min = Vector3.Min(min, vertex);
-            max = Vector3.Max(max, vertex);
+            // Skip "facet normal "
+            var values = line.Slice(12).Trim();
+            
+            Span<Range> ranges = stackalloc Range[3];
+            int count = values.Split(ranges, ' ', StringSplitOptions.RemoveEmptyEntries);
+            
+            if (count >= 3)
+            {
+                triangle.Normal = new Vector3(
+                    float.Parse(values[ranges[0]]),
+                    float.Parse(values[ranges[1]]),
+                    float.Parse(values[ranges[2]])
+                );
+            }
+        }
+
+        private Vector3 ParseVertex(ReadOnlySpan<char> line)
+        {
+            // Skip "vertex "
+            var values = line.Slice(6).Trim();
+            
+            Span<Range> ranges = stackalloc Range[3];
+            int count = values.Split(ranges, ' ', StringSplitOptions.RemoveEmptyEntries);
+            
+            if (count >= 3)
+            {
+                return new Vector3(
+                    float.Parse(values[ranges[0]]),
+                    float.Parse(values[ranges[1]]),
+                    float.Parse(values[ranges[2]])
+                );
+            }
+            
+            return Vector3.Zero;
         }
 
         private void CalculateModelProperties(StlModel model, Vector3 min, Vector3 max)
         {
             model.MinBounds = min;
             model.MaxBounds = max;
-            model.Center = (min + max) / 2;
+            model.Center = (min + max) * 0.5f;
 
             // Calculate scale to fit in a unit cube
             Vector3 size = max - min;
-            float maxDimension = Math.Max(Math.Max(size.X, size.Y), size.Z);
+            float maxDimension = MathF.Max(MathF.Max(size.X, size.Y), size.Z);
             model.Scale = maxDimension > 0 ? 1.0f / maxDimension : 1.0f;
         }
     }
