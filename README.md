@@ -510,7 +510,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 Copyright © 2025 Bob Koertge
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Polyform Noncommercial- see the LICENSE file for details.
 
 ## 👤 Author
 
