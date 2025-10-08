@@ -99,22 +99,24 @@ namespace MauiApp3
                         
                         if (objectCount > 1)
                         {
-                            var action = await DisplayActionSheet(
-                                $"This 3MF file contains {objectCount} objects. How would you like to import them?",
-                                "Cancel",
-                                null,
-                                "Import as single combined model",
-                                "Import each object separately"
-                            );
+                            // Show enhanced import options dialog
+                            var dialog = new Pages.ImportOptionsDialog(result.FileName, objectCount);
+                            await Navigation.PushModalAsync(dialog);
                             
-                            if (string.IsNullOrEmpty(action) || action == "Cancel")
-                                return;
+                            var action = await dialog.GetResultAsync();
                             
-                            if (action == "Import each object separately")
+                            await Navigation.PopModalAsync();
+                            
+                            if (string.IsNullOrEmpty(action))
+                                return; // User cancelled
+                            
+                            if (action == "separate")
                             {
                                 await ImportMultiObject3MfAsync(result, model3DService);
                                 return;
                             }
+                            
+                            // Otherwise continue with combined import
                         }
                     }
                     
