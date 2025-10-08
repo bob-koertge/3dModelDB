@@ -16,6 +16,7 @@ namespace MauiApp3.Models
         private byte[]? _thumbnailData;
         private StlParser.StlModel? _parsedModel;
         private string? _projectId;
+        private string? _projectName;
 
         public string Id
         {
@@ -68,12 +69,31 @@ namespace MauiApp3.Models
         public ObservableCollection<string> Tags { get; set; } = new();
 
         /// <summary>
+        /// Collection of attached image file paths or byte arrays serialized as base64
+        /// </summary>
+        public ObservableCollection<AttachedImage> AttachedImages { get; set; } = new();
+
+        /// <summary>
+        /// Collection of attached G-code files
+        /// </summary>
+        public ObservableCollection<AttachedGCode> AttachedGCodeFiles { get; set; } = new();
+
+        /// <summary>
         /// ID of the project this model belongs to (null if not in a project)
         /// </summary>
         public string? ProjectId
         {
             get => _projectId;
             set => SetProperty(ref _projectId, value);
+        }
+
+        /// <summary>
+        /// Name of the project this model belongs to (cached for display)
+        /// </summary>
+        public string? ProjectName
+        {
+            get => _projectName;
+            set => SetProperty(ref _projectName, value);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
