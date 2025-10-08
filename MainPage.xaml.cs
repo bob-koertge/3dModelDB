@@ -13,10 +13,6 @@ namespace MauiApp3
             
             // Subscribe to property changes to update the 3D viewer
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            
-            // Log to verify initialization
-            Console.WriteLine($"MainPage: BindingContext set to MainViewModel");
-            Console.WriteLine($"MainPage: UploadModelCommand is null? {viewModel.UploadModelCommand == null}");
         }
 
         private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -29,11 +25,17 @@ namespace MauiApp3
 
         private void UpdateViewer()
         {
-            // Always update the viewer when selection changes
-            if (ViewModel.SelectedModel?.ParsedModel != null)
+            try
             {
-                // Load the 3D model
-                Model3DViewer.LoadModel(ViewModel.SelectedModel.ParsedModel);
+                if (ViewModel.SelectedModel?.ParsedModel != null && Model3DViewer != null)
+                {
+                    Model3DViewer.LoadModel(ViewModel.SelectedModel.ParsedModel);
+                    System.Diagnostics.Debug.WriteLine($"Loaded model with {ViewModel.SelectedModel.ParsedModel.Triangles.Count:N0} triangles");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ERROR in UpdateViewer: {ex.Message}");
             }
         }
 
@@ -47,13 +49,8 @@ namespace MauiApp3
 
         private async void OnUploadButtonClicked(object sender, EventArgs e)
         {
-            Console.WriteLine("=== UPLOAD BUTTON CLICKED ===");
-            
             try
             {
-                Console.WriteLine("Opening file picker directly...");
-                
-                // Direct FilePicker call
                 var result = await FilePicker.Default.PickAsync(new PickOptions
                 {
                     PickerTitle = "Select 3D Model File",
@@ -63,17 +60,7 @@ namespace MauiApp3
                     })
                 });
                 
-                Console.WriteLine($"File picker result: {result?.FileName ?? "null"}");
-                
-                if (result == null)
-                {
-                    Console.WriteLine("User cancelled file selection");
-                    return;
-                }
-                
-                // File was selected - now process it
-                Console.WriteLine($"Processing file: {result.FileName}");
-                Console.WriteLine($"File path: {result.FullPath}");
+                if (result == null) return;
                 
                 // Validate file format
                 if (!result.FileName.EndsWith(".stl", StringComparison.OrdinalIgnoreCase) && 
@@ -83,70 +70,55 @@ namespace MauiApp3
                     return;
                 }
                 
-                // Show loading
                 ViewModel.IsLoading = true;
                 
                 try
                 {
-                    Console.WriteLine("Creating model object...");
-                    var fileInfo = new FileInfo(result.FullPath);
                     var extension = Path.GetExtension(result.FileName).ToUpperInvariant().TrimStart('.');
                     
-                    var model = new Models.Model3DFile
+                    // Special handling for 3MF files - check if multi-object
+                    if (extension == "3MF")
                     {
-                        Name = result.FileName,
-                        FilePath = result.FullPath,
-                        FileType = extension,
-                        FileSize = fileInfo.Length,
-                        UploadedDate = DateTime.Now
-                    };
-                    
-                    Console.WriteLine($"Parsing {extension} file...");
-                    
-                    // Use the Model3DService to load and parse
-                    var model3DService = Handler?.MauiContext?.Services.GetService<Services.Model3DService>();
-                    if (model3DService == null)
-                    {
-                        Console.WriteLine("ERROR: Could not get Model3DService from services");
-                        await DisplayAlert("Error", "Service initialization failed", "OK");
-                        return;
+                        var model3DService = Handler?.MauiContext?.Services.GetService<Services.Model3DService>();
+                        if (model3DService == null)
+                        {
+                            await DisplayAlert("Error", "Service initialization failed", "OK");
+                            return;
+                        }
+
+                        var threeMfParser = new Services.ThreeMfParser();
+                        var objectCount = await threeMfParser.GetObjectCountAsync(result.FullPath);
+                        
+                        if (objectCount == 0)
+                        {
+                            await DisplayAlert("No Geometry Found",
+                                $"This 3MF file contains no mesh geometry to display.",
+                                "OK");
+                            return;
+                        }
+                        
+                        if (objectCount > 1)
+                        {
+                            var action = await DisplayActionSheet(
+                                $"This 3MF file contains {objectCount} objects. How would you like to import them?",
+                                "Cancel",
+                                null,
+                                "Import as single combined model",
+                                "Import each object separately"
+                            );
+                            
+                            if (string.IsNullOrEmpty(action) || action == "Cancel")
+                                return;
+                            
+                            if (action == "Import each object separately")
+                            {
+                                await ImportMultiObject3MfAsync(result, model3DService);
+                                return;
+                            }
+                        }
                     }
                     
-                    model.ParsedModel = await model3DService.LoadModelAsync(result.FullPath);
-                    
-                    if (model.ParsedModel == null)
-                    {
-                        Console.WriteLine("ERROR: Failed to parse model");
-                        await DisplayAlert("Error", $"Failed to parse {extension} file. The file may be corrupted or invalid.", "OK");
-                        return;
-                    }
-                    
-                    Console.WriteLine($"Successfully parsed {model.ParsedModel.Triangles.Count} triangles");
-                    Console.WriteLine("Generating thumbnail...");
-                    
-                    // Generate thumbnail
-                    model.ThumbnailData = await model3DService.GenerateThumbnailAsync(result.FullPath, model.ParsedModel);
-                    
-                    Console.WriteLine("Adding model to collection...");
-                    
-                    // Add to ViewModel
-                    ViewModel.Models.Add(model);
-                    ViewModel.SelectedModel = model;
-                    
-                    Console.WriteLine("Saving to database...");
-                    
-                    // Save to database
-                    var databaseService = Handler?.MauiContext?.Services.GetService<Services.DatabaseService>();
-                    if (databaseService != null)
-                    {
-                        await databaseService.SaveModelAsync(model);
-                        Console.WriteLine("Saved to database successfully");
-                    }
-                    
-                    Console.WriteLine("Upload complete!");
-                    await DisplayAlert("Success", 
-                        $"Model '{model.Name}' loaded successfully!\n\nTriangles: {model.ParsedModel.Triangles.Count:N0}", 
-                        "OK");
+                    await ImportSingleModelAsync(result);
                 }
                 finally
                 {
@@ -155,22 +127,261 @@ namespace MauiApp3
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ERROR: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"Upload error: {ex.Message}");
                 ViewModel.IsLoading = false;
-                await DisplayAlert("Error", $"Failed to upload model:\n{ex.Message}", "OK");
+                await DisplayAlert("Error", $"Failed to upload model: {ex.Message}", "OK");
             }
         }
+
+        private async Task ImportSingleModelAsync(FileResult result)
+        {
+            try
+            {
+                ViewModel.IsLoading = true;
+                
+                var fileInfo = new FileInfo(result.FullPath);
+                var extension = Path.GetExtension(result.FileName).ToUpperInvariant().TrimStart('.');
+                
+                var model = new Models.Model3DFile
+                {
+                    Name = result.FileName,
+                    FilePath = result.FullPath,
+                    FileType = extension,
+                    FileSize = fileInfo.Length,
+                    UploadedDate = DateTime.Now
+                };
+                
+                var model3DService = Handler?.MauiContext?.Services.GetService<Services.Model3DService>();
+                if (model3DService == null)
+                {
+                    await DisplayAlert("Error", "Service initialization failed", "OK");
+                    return;
+                }
+                
+                model.ParsedModel = await model3DService.LoadModelAsync(result.FullPath);
+                
+                if (model.ParsedModel == null)
+                {
+                    await DisplayAlert("Error", $"Failed to parse {extension} file.", "OK");
+                    return;
+                }
+                
+                if (model.ParsedModel.Triangles.Count == 0)
+                {
+                    await DisplayAlert("Warning", "The file contains no geometry.", "OK");
+                    return;
+                }
+                
+                // Generate thumbnail
+                try
+                {
+                    model.ThumbnailData = await model3DService.GenerateThumbnailAsync(result.FullPath, model.ParsedModel);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Thumbnail generation failed: {ex.Message}");
+                }
+                
+                // Add to collection and database
+                ViewModel.Models.Add(model);
+                ViewModel.SelectedModel = model;
+                
+                var databaseService = Handler?.MauiContext?.Services.GetService<Services.DatabaseService>();
+                if (databaseService != null)
+                {
+                    await databaseService.SaveModelAsync(model);
+                }
+                
+                // Force viewer update
+                await MainThread.InvokeOnMainThreadAsync(() => UpdateViewer());
+                
+                await DisplayAlert("Success", 
+                    $"Model loaded successfully!\n\nTriangles: {model.ParsedModel.Triangles.Count:N0}", 
+                    "OK");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Import error: {ex.Message}");
+                await DisplayAlert("Error", $"Failed to import model: {ex.Message}", "OK");
+            }
+            finally
+            {
+                ViewModel.IsLoading = false;
+            }
+        }
+
+        private async Task ImportMultiObject3MfAsync(FileResult result, Services.Model3DService model3DService)
+        {
+            try
+            {
+                var threeMfParser = new Services.ThreeMfParser();
+                var objects = await threeMfParser.ParseMultipleObjectsAsync(result.FullPath);
+                
+                if (objects.Count == 0)
+                {
+                    await DisplayAlert("Error", "No valid objects found in 3MF file.", "OK");
+                    return;
+                }
+                
+                var baseFileName = Path.GetFileNameWithoutExtension(result.FileName);
+                
+                // Prompt user for project name
+                var projectName = await DisplayPromptAsync(
+                    "Create Project",
+                    $"Import {objects.Count} objects as a project?\n\nEnter project name:",
+                    "Create & Import",
+                    "Cancel",
+                    placeholder: baseFileName,
+                    initialValue: baseFileName
+                );
+                
+                if (string.IsNullOrWhiteSpace(projectName))
+                {
+                    return; // User cancelled
+                }
+                
+                // Create the project
+                var project = new Models.Project
+                {
+                    Name = projectName,
+                    Description = $"Multi-object import from {result.FileName} ({objects.Count} objects)",
+                    CreatedDate = DateTime.Now,
+                    ModifiedDate = DateTime.Now,
+                    Color = GenerateProjectColor()
+                };
+                
+                ViewModel.Projects.Add(project);
+                
+                var databaseService = Handler?.MauiContext?.Services.GetService<Services.DatabaseService>();
+                if (databaseService != null)
+                {
+                    await databaseService.SaveProjectAsync(project);
+                }
+                
+                // Now import all objects and link them to the project
+                var fileInfo = new FileInfo(result.FullPath);
+                int successCount = 0;
+                Models.Model3DFile? lastModel = null;
+                
+                foreach (var (objectName, parsedModel) in objects)
+                {
+                    try
+                    {
+                        var model = new Models.Model3DFile
+                        {
+                            Name = $"{baseFileName} - {objectName}",
+                            FilePath = result.FullPath,
+                            FileType = "3MF",
+                            FileSize = fileInfo.Length / objects.Count,
+                            UploadedDate = DateTime.Now,
+                            ParsedModel = parsedModel,
+                            ProjectId = project.Id // Link to project
+                        };
+                        
+                        model.ThumbnailData = await model3DService.GenerateThumbnailAsync(result.FullPath, parsedModel);
+                        
+                        ViewModel.Models.Add(model);
+                        lastModel = model;
+                        
+                        if (databaseService != null)
+                        {
+                            await databaseService.SaveModelAsync(model);
+                            await databaseService.AssignModelToProjectAsync(model.Id, project.Id);
+                        }
+                        
+                        // Add model to project's ModelIds collection
+                        if (!project.ModelIds.Contains(model.Id))
+                        {
+                            project.ModelIds.Add(model.Id);
+                        }
+                        
+                        successCount++;
+                        System.Diagnostics.Debug.WriteLine($"Imported '{model.Name}' and linked to project '{project.Name}'");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to import object {objectName}: {ex.Message}");
+                    }
+                }
+                
+                // Update project with all model IDs
+                if (databaseService != null)
+                {
+                    await databaseService.SaveProjectAsync(project);
+                }
+                
+                if (lastModel != null)
+                {
+                    ViewModel.SelectedModel = lastModel;
+                }
+                
+                // Select the newly created project to show all imported models
+                ViewModel.SelectedProject = project;
+                
+                await DisplayAlert("Success", 
+                    $"Created project '{projectName}' with {successCount} object(s)!\n\n" +
+                    $"All objects have been linked to the project.", 
+                    "OK");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Multi-object import error: {ex.Message}");
+                await DisplayAlert("Error", $"Failed to import: {ex.Message}", "OK");
+            }
+        }
+
+        /// <summary>
+        /// Generate a random color for the project
+        /// </summary>
+        private string GenerateProjectColor()
+        {
+            var colors = new[]
+            {
+                "#2196F3", // Blue
+                "#4CAF50", // Green
+                "#FF9800", // Orange
+                "#9C27B0", // Purple
+                "#F44336", // Red
+                "#00BCD4", // Cyan
+                "#FF5722", // Deep Orange
+                "#3F51B5", // Indigo
+                "#009688", // Teal
+                "#795548"  // Brown
+            };
+            
+            var random = new Random();
+            return colors[random.Next(colors.Length)];
+        }
+
+        private bool _isFirstAppearing = true;
 
         protected override void OnAppearing()
         {
             base.OnAppearing();
             
-            // Refresh the viewer if a model is selected
+            // Re-subscribe to property changes
+            if (BindingContext is MainViewModel vm && !ReferenceEquals(vm, ViewModel))
+            {
+                vm.PropertyChanged += OnViewModelPropertyChanged;
+            }
+            
+            // Refresh viewer if model selected
             if (ViewModel.SelectedModel?.ParsedModel != null)
             {
                 Model3DViewer.LoadModel(ViewModel.SelectedModel.ParsedModel);
             }
+            
+            // Only refresh data if we're returning from another page (like detail view)
+            // Don't refresh on initial page load to avoid duplicates
+            if (!_isFirstAppearing)
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    await Task.Delay(100);
+                    await ViewModel.RefreshDataAsync();
+                });
+            }
+            _isFirstAppearing = false;
         }
 
         protected override void OnDisappearing()

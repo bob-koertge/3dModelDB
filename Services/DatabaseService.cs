@@ -27,6 +27,7 @@ namespace MauiApp3.Services
 
             _database = new SQLiteAsyncConnection(_dbPath);
             await _database.CreateTableAsync<Model3DFileDb>();
+            await _database.CreateTableAsync<ProjectDb>();
         }
 
         /// <summary>
@@ -183,7 +184,8 @@ namespace MauiApp3.Services
                 UploadedDate = dbModel.UploadedDate,
                 FileSize = dbModel.FileSize,
                 ThumbnailData = dbModel.ThumbnailData,
-                Tags = tags
+                Tags = tags,
+                ProjectId = dbModel.ProjectId
                 // ParsedModel will be loaded separately when needed
             };
         }
@@ -206,7 +208,8 @@ namespace MauiApp3.Services
                 UploadedDate = model.UploadedDate,
                 FileSize = model.FileSize,
                 ThumbnailData = model.ThumbnailData,
-                TagsString = tagsString
+                TagsString = tagsString,
+                ProjectId = model.ProjectId
             };
         }
 
@@ -214,5 +217,241 @@ namespace MauiApp3.Services
         /// Get database file path (for debugging)
         /// </summary>
         public string GetDatabasePath() => _dbPath;
+
+        /// <summary>
+        /// Clear all data from the database (models and projects)
+        /// </summary>
+        public async Task ClearAllDataAsync()
+        {
+            await InitAsync();
+            
+            Console.WriteLine("DatabaseService: Clearing all data...");
+            
+            // Delete all models
+            var modelsDeleted = await _database!.DeleteAllAsync<Model3DFileDb>();
+            Console.WriteLine($"DatabaseService: Deleted {modelsDeleted} models");
+            
+            // Delete all projects
+            var projectsDeleted = await _database!.DeleteAllAsync<ProjectDb>();
+            Console.WriteLine($"DatabaseService: Deleted {projectsDeleted} projects");
+            
+            Console.WriteLine("DatabaseService: All data cleared successfully");
+        }
+
+        /// <summary>
+        /// Delete the database file completely and reinitialize
+        /// </summary>
+        public async Task ResetDatabaseAsync()
+        {
+            Console.WriteLine("DatabaseService: Resetting database...");
+            
+            // Close the connection
+            if (_database != null)
+            {
+                await _database.CloseAsync();
+                _database = null;
+            }
+            
+            // Delete the database file
+            if (File.Exists(_dbPath))
+            {
+                File.Delete(_dbPath);
+                Console.WriteLine($"DatabaseService: Deleted database file at {_dbPath}");
+            }
+            
+            // Reinitialize (creates new empty database)
+            await InitAsync();
+            
+            Console.WriteLine("DatabaseService: Database reset complete");
+        }
+
+        #region Project Operations
+
+        /// <summary>
+        /// Get all projects from database
+        /// </summary>
+        public async Task<List<Project>> GetAllProjectsAsync()
+        {
+            await InitAsync();
+            
+            var dbProjects = await _database!.Table<ProjectDb>().ToListAsync();
+            
+            return dbProjects.Select(ConvertToProject).ToList();
+        }
+
+        /// <summary>
+        /// Get a single project by ID
+        /// </summary>
+        public async Task<Project?> GetProjectByIdAsync(string projectId)
+        {
+            await InitAsync();
+            
+            var dbProject = await _database!.Table<ProjectDb>()
+                .Where(p => p.Id == projectId)
+                .FirstOrDefaultAsync();
+
+            return dbProject != null ? ConvertToProject(dbProject) : null;
+        }
+
+        /// <summary>
+        /// Save or update a project
+        /// </summary>
+        public async Task<int> SaveProjectAsync(Project project)
+        {
+            await InitAsync();
+            
+            project.ModifiedDate = DateTime.Now;
+            var dbProject = ConvertToDbProject(project);
+            
+            var existing = await _database!.Table<ProjectDb>()
+                .Where(p => p.Id == project.Id)
+                .FirstOrDefaultAsync();
+
+            if (existing != null)
+            {
+                return await _database.UpdateAsync(dbProject);
+            }
+            else
+            {
+                return await _database.InsertAsync(dbProject);
+            }
+        }
+
+        /// <summary>
+        /// Delete a project from database
+        /// </summary>
+        public async Task<int> DeleteProjectAsync(string projectId)
+        {
+            await InitAsync();
+            
+            // Remove project reference from models
+            var modelsInProject = await _database!.Table<Model3DFileDb>()
+                .Where(m => m.ProjectId == projectId)
+                .ToListAsync();
+
+            foreach (var model in modelsInProject)
+            {
+                model.ProjectId = null;
+                await _database.UpdateAsync(model);
+            }
+            
+            return await _database.Table<ProjectDb>()
+                .DeleteAsync(p => p.Id == projectId);
+        }
+
+        /// <summary>
+        /// Get all models belonging to a project
+        /// </summary>
+        public async Task<List<Model3DFile>> GetModelsByProjectIdAsync(string projectId)
+        {
+            await InitAsync();
+            
+            var dbModels = await _database!.Table<Model3DFileDb>()
+                .Where(m => m.ProjectId == projectId)
+                .ToListAsync();
+
+            return dbModels.Select(ConvertToModel).ToList();
+        }
+
+        /// <summary>
+        /// Get all models not assigned to any project
+        /// </summary>
+        public async Task<List<Model3DFile>> GetUnassignedModelsAsync()
+        {
+            await InitAsync();
+            
+            var dbModels = await _database!.Table<Model3DFileDb>()
+                .Where(m => m.ProjectId == null || m.ProjectId == "")
+                .ToListAsync();
+
+            return dbModels.Select(ConvertToModel).ToList();
+        }
+
+        /// <summary>
+        /// Assign a model to a project
+        /// </summary>
+        public async Task<int> AssignModelToProjectAsync(string modelId, string projectId)
+        {
+            await InitAsync();
+            
+            var model = await _database!.Table<Model3DFileDb>()
+                .Where(m => m.Id == modelId)
+                .FirstOrDefaultAsync();
+
+            if (model != null)
+            {
+                model.ProjectId = projectId;
+                return await _database.UpdateAsync(model);
+            }
+            
+            return 0;
+        }
+
+        /// <summary>
+        /// Remove a model from its project
+        /// </summary>
+        public async Task<int> RemoveModelFromProjectAsync(string modelId)
+        {
+            await InitAsync();
+            
+            var model = await _database!.Table<Model3DFileDb>()
+                .Where(m => m.Id == modelId)
+                .FirstOrDefaultAsync();
+
+            if (model != null)
+            {
+                model.ProjectId = null;
+                return await _database.UpdateAsync(model);
+            }
+            
+            return 0;
+        }
+
+        /// <summary>
+        /// Convert database project to app project
+        /// </summary>
+        private Project ConvertToProject(ProjectDb dbProject)
+        {
+            var modelIds = string.IsNullOrEmpty(dbProject.ModelIds)
+                ? new ObservableCollection<string>()
+                : new ObservableCollection<string>(
+                    dbProject.ModelIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(id => id.Trim())
+                );
+
+            return new Project
+            {
+                Id = dbProject.Id,
+                Name = dbProject.Name,
+                Description = dbProject.Description,
+                CreatedDate = dbProject.CreatedDate,
+                ModifiedDate = dbProject.ModifiedDate,
+                Color = dbProject.Color,
+                ModelIds = modelIds
+            };
+        }
+
+        /// <summary>
+        /// Convert app project to database project
+        /// </summary>
+        private ProjectDb ConvertToDbProject(Project project)
+        {
+            var modelIds = project.ModelIds.Any()
+                ? string.Join(",", project.ModelIds)
+                : string.Empty;
+
+            return new ProjectDb
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Description = project.Description,
+                CreatedDate = project.CreatedDate,
+                ModifiedDate = project.ModifiedDate,
+                Color = project.Color,
+                ModelIds = modelIds
+            };
+        }
+
+        #endregion
     }
 }

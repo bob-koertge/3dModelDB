@@ -10,6 +10,7 @@ namespace MauiApp3
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
+            
             builder
                 .UseMauiApp<App>()
                 .UseSkiaSharp()
@@ -30,7 +31,7 @@ namespace MauiApp3
             builder.Services.AddTransient<MainPage>();
 
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
 
             return builder.Build();

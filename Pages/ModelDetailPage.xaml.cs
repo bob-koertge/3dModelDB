@@ -45,10 +45,24 @@ namespace MauiApp3.Pages
             });
         }
 
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+            
+            // Reload 3D model if needed
+            if (_model?.ParsedModel != null)
+            {
+                Model3DViewer.LoadModel(_model.ParsedModel);
+            }
+        }
+
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
             WeakReferenceMessenger.Default.Unregister<ResetViewMessage>(this);
+            
+            // Notify that we're leaving - main page should refresh
+            Console.WriteLine("ModelDetailPage: OnDisappearing - changes may have been made");
         }
     }
 }
