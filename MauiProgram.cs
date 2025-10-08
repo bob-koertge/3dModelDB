@@ -2,6 +2,7 @@
 using MauiApp3.Services;
 using MauiApp3.ViewModels;
 using SkiaSharp.Views.Maui.Controls.Hosting;
+using System.Diagnostics;
 
 namespace MauiApp3
 {
@@ -30,7 +31,13 @@ namespace MauiApp3
             builder.Services.AddTransient<MainPage>();
 
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
+            
+            // Enable all trace output
+            Debug.WriteLine("=== MAUI APP STARTING ===");
+            Debug.WriteLine($"Debug logging enabled");
+            Trace.Listeners.Add(new TextWriterTraceListener(System.Console.Out));
+            Trace.AutoFlush = true;
 #endif
 
             return builder.Build();

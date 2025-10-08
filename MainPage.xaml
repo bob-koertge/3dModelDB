@@ -71,6 +71,14 @@
                                 </Label.FormattedText>
                             </Label>
                             
+                            <Label TextColor="#CCCCCC">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="Projects: " FontAttributes="Bold"/>
+                                        <Span Text="{Binding Projects.Count}"/>
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
 
                             <Label Text="Quick Actions"
                                    FontSize="14"
@@ -85,12 +93,21 @@
                                     TextColor="White"
                                     CornerRadius="6"
                                     Padding="10"/>
+                            
+                            <Button Text="📂 New Project"
+                                    Command="{Binding CreateProjectCommand}"
+                                    BackgroundColor="#107C10"
+                                    TextColor="White"
+                                    CornerRadius="6"
+                                    Padding="10"/>
                         </VerticalStackLayout>
                     </Frame>
 
-                    <Label Text="File Filters"
+                    <!-- Projects List -->
+                    <Label Text="Projects"
                            FontSize="14"
-                           TextColor="#AAAAAA"
+                           FontAttributes="Bold"
+                           TextColor="White"
                            Margin="0,10,0,5"/>
 
                     <Frame BackgroundColor="#3C3C3C" 
@@ -98,15 +115,156 @@
                            CornerRadius="8"
                            HasShadow="False">
                         <VerticalStackLayout Spacing="5">
-                            <Label Text="⬜ All Files"
-                                   TextColor="White"
-                                   Padding="5"/>
-                            <Label Text="🔹 STL Files"
-                                   TextColor="#CCCCCC"
-                                   Padding="5"/>
-                            <Label Text="🔸 3MF Files"
-                                   TextColor="#CCCCCC"
-                                   Padding="5"/>
+                            <!-- All Models Button -->
+                            <Frame BackgroundColor="#0078D4"
+                                   Padding="8"
+                                   CornerRadius="6"
+                                   HasShadow="False"
+                                   Margin="0,0,0,5">
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectProjectCommand}"
+                                                        CommandParameter="{x:Null}"/>
+                                </Frame.GestureRecognizers>
+                                <Label Text="📚 All Models"
+                                       TextColor="White"
+                                       FontAttributes="Bold"/>
+                            </Frame>
+                            
+                            <!-- Projects Collection -->
+                            <CollectionView ItemsSource="{Binding Projects}">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Project">
+                                        <SwipeView>
+                                            <SwipeView.RightItems>
+                                                <SwipeItems>
+                                                    <SwipeItem Text="Delete"
+                                                             BackgroundColor="#C42B1C"
+                                                             Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=DeleteProjectCommand}"
+                                                             CommandParameter="{Binding .}"/>
+                                                </SwipeItems>
+                                            </SwipeView.RightItems>
+                                            
+                                            <Frame BackgroundColor="#2C2C2C"
+                                                   Padding="8"
+                                                   CornerRadius="6"
+                                                   HasShadow="False"
+                                                   Margin="0,2">
+                                                <Frame.GestureRecognizers>
+                                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=SelectProjectCommand}"
+                                                                        CommandParameter="{Binding .}"/>
+                                                </Frame.GestureRecognizers>
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <BoxView Grid.Column="0"
+                                                           Color="{Binding Color}"
+                                                           WidthRequest="4"
+                                                           HeightRequest="30"
+                                                           CornerRadius="2"
+                                                           Margin="0,0,10,0"/>
+                                                    <Label Grid.Column="1"
+                                                           Text="{Binding Name}"
+                                                           TextColor="White"
+                                                           VerticalOptions="Center"/>
+                                                    <Label Grid.Column="2"
+                                                           Text="{Binding ModelIds.Count, StringFormat='{0}'}"
+                                                           TextColor="#AAAAAA"
+                                                           FontSize="12"
+                                                           VerticalOptions="Center"/>
+                                                </Grid>
+                                            </Frame>
+                                        </SwipeView>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                                <CollectionView.EmptyView>
+                                    <Label Text="No projects yet"
+                                           TextColor="#888888"
+                                           FontSize="12"
+                                           FontAttributes="Italic"
+                                           Padding="10"/>
+                                </CollectionView.EmptyView>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <Label Text="File Filters"
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           Margin="0,10,0,5"/>
+
+                    <Frame BackgroundColor="#3C3C3C" 
+                           Padding="10"
+                           CornerRadius="8"
+                           HasShadow="False">
+                        <VerticalStackLayout Spacing="5">
+                            <!-- All Files Filter -->
+                            <Frame Padding="8"
+                                   CornerRadius="6"
+                                   HasShadow="False"
+                                   Margin="0,2">
+                                <Frame.Triggers>
+                                    <DataTrigger TargetType="Frame"
+                                               Binding="{Binding SelectedFileFilter}"
+                                               Value="{x:Null}">
+                                        <Setter Property="BackgroundColor" Value="#0078D4"/>
+                                    </DataTrigger>
+                                </Frame.Triggers>
+                                <Frame.Behaviors>
+                                    <behaviors:EventToCommandBehavior EventName="Tapped"
+                                                                    Command="{Binding SelectFileFilterCommand}"
+                                                                    CommandParameter="{x:Null}"/>
+                                </Frame.Behaviors>
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectFileFilterCommand}"
+                                                        CommandParameter="{x:Null}"/>
+                                </Frame.GestureRecognizers>
+                                <Label Text="⬜ All Files"
+                                       TextColor="White"
+                                       Padding="5"/>
+                            </Frame>
+                            
+                            <!-- STL Files Filter -->
+                            <Frame Padding="8"
+                                   CornerRadius="6"
+                                   HasShadow="False"
+                                   BackgroundColor="#2C2C2C"
+                                   Margin="0,2">
+                                <Frame.Triggers>
+                                    <DataTrigger TargetType="Frame"
+                                               Binding="{Binding SelectedFileFilter}"
+                                               Value="STL">
+                                        <Setter Property="BackgroundColor" Value="#0078D4"/>
+                                    </DataTrigger>
+                                </Frame.Triggers>
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectFileFilterCommand}"
+                                                        CommandParameter="STL"/>
+                                </Frame.GestureRecognizers>
+                                <Label Text="🔹 STL Files"
+                                       TextColor="White"
+                                       Padding="5"/>
+                            </Frame>
+                            
+                            <!-- 3MF Files Filter -->
+                            <Frame Padding="8"
+                                   CornerRadius="6"
+                                   HasShadow="False"
+                                   BackgroundColor="#2C2C2C"
+                                   Margin="0,2">
+                                <Frame.Triggers>
+                                    <DataTrigger TargetType="Frame"
+                                               Binding="{Binding SelectedFileFilter}"
+                                               Value="3MF">
+                                        <Setter Property="BackgroundColor" Value="#0078D4"/>
+                                    </DataTrigger>
+                                </Frame.Triggers>
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding SelectFileFilterCommand}"
+                                                        CommandParameter="3MF"/>
+                                </Frame.GestureRecognizers>
+                                <Label Text="🔸 3MF Files"
+                                       TextColor="White"
+                                       Padding="5"/>
+                            </Frame>
                         </VerticalStackLayout>
                     </Frame>
                 </VerticalStackLayout>
@@ -115,10 +273,22 @@
             <!-- Drawer Footer -->
             <VerticalStackLayout Grid.Row="2" 
                                Padding="15"
-                               BackgroundColor="#1E1E1E">
+                               BackgroundColor="#1E1E1E"
+                               Spacing="10">
                 <BoxView HeightRequest="1" 
                          BackgroundColor="#444444"
                          Margin="0,0,0,10"/>
+                
+                <!-- Reset Database Button -->
+                <Button Text="🗑️ Reset Database"
+                        Command="{Binding ResetDatabaseCommand}"
+                        BackgroundColor="#C42B1C"
+                        TextColor="White"
+                        CornerRadius="6"
+                        Padding="10"
+                        FontSize="12"
+                        Margin="0,0,0,10"/>
+                
                 <Label Text="© 2025 Bob Koertge"
                        FontSize="12"
                        TextColor="#888888"
@@ -168,9 +338,8 @@
             <ScrollView Grid.Row="1">
                 <CollectionView ItemsSource="{Binding Models}"
                                SelectionMode="Single"
-                               SelectedItem="{Binding SelectedModel}"
                                SelectionChangedCommand="{Binding SelectModelCommand}"
-                               SelectionChangedCommandParameter="{Binding SelectedModel}">
+                               SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}}">
                     <CollectionView.ItemsLayout>
                         <GridItemsLayout Orientation="Vertical"
                                        Span="3"
@@ -202,6 +371,7 @@
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="100"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -241,8 +411,29 @@
                                            LineBreakMode="TailTruncation"
                                            Margin="0,10,0,5"/>
 
+                                    <!-- Project Badge (if assigned) -->
+                                    <Frame Grid.Row="2"
+                                           BackgroundColor="#107C10"
+                                           Padding="5,2"
+                                           CornerRadius="4"
+                                           HasShadow="False"
+                                           Margin="0,0,0,5"
+                                           IsVisible="{Binding ProjectId, Converter={StaticResource IsNotNullConverter}}">
+                                        <HorizontalStackLayout Spacing="5">
+                                            <Label Text="📂"
+                                                   FontSize="10"
+                                                   TextColor="White"
+                                                   VerticalOptions="Center"/>
+                                            <Label Text="In Project"
+                                                   FontSize="10"
+                                                   FontAttributes="Bold"
+                                                   TextColor="White"
+                                                   VerticalOptions="Center"/>
+                                        </HorizontalStackLayout>
+                                    </Frame>
+
                                     <!-- File Type Badge -->
-                                    <HorizontalStackLayout Grid.Row="2" Spacing="5" Margin="0,0,0,5">
+                                    <HorizontalStackLayout Grid.Row="3" Spacing="5" Margin="0,0,0,5">
                                         <Frame BackgroundColor="#0078D4"
                                                Padding="5,2"
                                                CornerRadius="4"
@@ -259,7 +450,7 @@
                                     </HorizontalStackLayout>
 
                                     <!-- Tags Display -->
-                                    <FlexLayout Grid.Row="3"
+                                    <FlexLayout Grid.Row="4"
                                                Wrap="Wrap"
                                                Direction="Row"
                                                JustifyContent="Start"
@@ -284,7 +475,7 @@
                                     </FlexLayout>
 
                                     <!-- Upload Date -->
-                                    <Label Grid.Row="4"
+                                    <Label Grid.Row="5"
                                            Text="{Binding UploadedDate, StringFormat='Uploaded: {0:MM/dd/yyyy}'}"
                                            FontSize="11"
                                            TextColor="#888888"/>
@@ -465,6 +656,24 @@
                                        FontAttributes="Bold"
                                        TextColor="White"/>
                                 <HorizontalStackLayout Spacing="5">
+                                    <Button Text="📂 Project"
+                                            FontSize="11"
+                                            Command="{Binding AddModelToProjectCommand}"
+                                            CommandParameter="{Binding SelectedModel}"
+                                            BackgroundColor="#107C10"
+                                            TextColor="White"
+                                            CornerRadius="4"
+                                            Padding="10,5"
+                                            IsVisible="{Binding SelectedModel.ProjectId, Converter={StaticResource IsNullConverter}}"/>
+                                    <Button Text="Remove from Project"
+                                            FontSize="11"
+                                            Command="{Binding RemoveModelFromProjectCommand}"
+                                            CommandParameter="{Binding SelectedModel}"
+                                            BackgroundColor="#CA5010"
+                                            TextColor="White"
+                                            CornerRadius="4"
+                                            Padding="10,5"
+                                            IsVisible="{Binding SelectedModel.ProjectId, Converter={StaticResource IsNotNullConverter}}"/>
                                     <Button Text="Export"
                                             FontSize="11"
                                             BackgroundColor="#0078D4"

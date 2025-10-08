@@ -31,5 +31,10 @@ namespace MauiApp3.Models
         /// Tags stored as comma-separated string for SQLite compatibility
         /// </summary>
         public string TagsString { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// ID of the project this model belongs to (null if not in a project)
+        /// </summary>
+        public string? ProjectId { get; set; }
     }
 }
