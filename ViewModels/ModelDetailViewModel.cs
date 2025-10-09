@@ -142,25 +142,34 @@ namespace MauiApp3.ViewModels
 
         #region Tag Management
 
-        private void AddTag()
+        private async void AddTag()
         {
             if (string.IsNullOrWhiteSpace(NewTagText))
                 return;
 
             var trimmedTag = NewTagText.Trim();
             
+            // Normalize to single spacing
+            trimmedTag = string.Join(' ', trimmedTag.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            
             if (Model.Tags.Contains(trimmedTag, StringComparer.OrdinalIgnoreCase))
                 return;
 
             Model.Tags.Add(trimmedTag);
             NewTagText = string.Empty;
+            await SaveModelAsync(); // persist immediately
         }
 
-        private void RemoveTag(string? tag)
+        private async void RemoveTag(string? tag)
         {
             if (!string.IsNullOrEmpty(tag))
             {
-                Model.Tags.Remove(tag);
+                var existing = Model.Tags.FirstOrDefault(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    Model.Tags.Remove(existing);
+                    await SaveModelAsync(); // persist removal
+                }
             }
         }
 
