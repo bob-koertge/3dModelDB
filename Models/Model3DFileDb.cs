@@ -33,6 +33,18 @@ namespace MauiApp3.Models
         public string TagsString { get; set; } = string.Empty;
         
         /// <summary>
+        /// Attached images stored as JSON string
+        /// </summary>
+        [MaxLength(10000000)] // 10MB max for images
+        public string? AttachedImagesJson { get; set; }
+        
+        /// <summary>
+        /// Attached G-code files stored as JSON string
+        /// </summary>
+        [MaxLength(5000000)] // 5MB max for G-code metadata
+        public string? AttachedGCodeJson { get; set; }
+        
+        /// <summary>
         /// ID of the project this model belongs to (null if not in a project)
         /// </summary>
         public string? ProjectId { get; set; }

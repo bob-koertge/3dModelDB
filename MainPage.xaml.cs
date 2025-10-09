@@ -11,39 +11,16 @@ namespace MauiApp3
             InitializeComponent();
             BindingContext = viewModel;
             
-            // Subscribe to property changes to update the 3D viewer
+            // Subscribe to property changes
             viewModel.PropertyChanged += OnViewModelPropertyChanged;
         }
 
         private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            // No need to update viewer since we're using static images now
             if (e.PropertyName == nameof(MainViewModel.SelectedModel))
             {
-                UpdateViewer();
-            }
-        }
-
-        private void UpdateViewer()
-        {
-            try
-            {
-                if (ViewModel.SelectedModel?.ParsedModel != null && Model3DViewer != null)
-                {
-                    Model3DViewer.LoadModel(ViewModel.SelectedModel.ParsedModel);
-                    System.Diagnostics.Debug.WriteLine($"Loaded model with {ViewModel.SelectedModel.ParsedModel.Triangles.Count:N0} triangles");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"ERROR in UpdateViewer: {ex.Message}");
-            }
-        }
-
-        private void OnResetViewClicked(object sender, EventArgs e)
-        {
-            if (ViewModel.SelectedModel?.ParsedModel != null)
-            {
-                Model3DViewer.ResetView();
+                System.Diagnostics.Debug.WriteLine($"Selected model changed to: {ViewModel.SelectedModel?.Name ?? "null"}");
             }
         }
 
@@ -193,9 +170,6 @@ namespace MauiApp3
                 {
                     await databaseService.SaveModelAsync(model);
                 }
-                
-                // Force viewer update
-                await MainThread.InvokeOnMainThreadAsync(() => UpdateViewer());
                 
                 await DisplayAlert("Success", 
                     $"Model loaded successfully!\n\nTriangles: {model.ParsedModel.Triangles.Count:N0}", 
@@ -365,12 +339,6 @@ namespace MauiApp3
             if (BindingContext is MainViewModel vm && !ReferenceEquals(vm, ViewModel))
             {
                 vm.PropertyChanged += OnViewModelPropertyChanged;
-            }
-            
-            // Refresh viewer if model selected
-            if (ViewModel.SelectedModel?.ParsedModel != null)
-            {
-                Model3DViewer.LoadModel(ViewModel.SelectedModel.ParsedModel);
             }
             
             // Only refresh data if we're returning from another page (like detail view)

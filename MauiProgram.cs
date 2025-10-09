@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using MauiApp3.Services;
 using MauiApp3.ViewModels;
+using MauiApp3.Pages;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace MauiApp3
@@ -29,6 +30,7 @@ namespace MauiApp3
             
             // Register Pages
             builder.Services.AddTransient<MainPage>();
+            builder.Services.AddTransient<ModelDetailPage>();
 
 #if DEBUG
             builder.Logging.AddDebug();
