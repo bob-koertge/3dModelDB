@@ -805,6 +805,26 @@
                  WidthRequest="1"
                  BackgroundColor="#444444"
                  HorizontalOptions="End"/>
+
+        <!-- LOADING OVERLAY -->
+        <Grid IsVisible="{Binding IsLoading}"
+              BackgroundColor="#80000000"
+              VerticalOptions="FillAndExpand"
+              HorizontalOptions="FillAndExpand"
+              ZIndex="100">
+            <ActivityIndicator IsRunning="True"
+                               Color="#0078D4"
+                               WidthRequest="64"
+                               HeightRequest="64"
+                               VerticalOptions="Center"
+                               HorizontalOptions="Center"/>
+            <Label Text="Loading..."
+                   TextColor="White"
+                   FontSize="18"
+                   VerticalOptions="Center"
+                   HorizontalOptions="Center"
+                   Margin="0,80,0,0"/>
+        </Grid>
     </Grid>
 
 </ContentPage>
